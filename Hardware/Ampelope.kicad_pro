@@ -115,6 +115,7 @@
       },
       "track_widths": [
         0.0,
+        0.25,
         0.3,
         0.5
       ],
@@ -310,6 +311,7 @@
     ],
     "rule_severities": {
       "bus_definition_conflict": "error",
+      "bus_entry_needed": "error",
       "bus_label_syntax": "error",
       "bus_to_bus_conflict": "error",
       "bus_to_net_conflict": "error",
@@ -366,7 +368,7 @@
       }
     ],
     "meta": {
-      "version": 0
+      "version": 1
     },
     "net_colors": {
       "GND": "rgb(48, 255, 59)"
@@ -391,6 +393,7 @@
       "default_text_size": 50.0,
       "default_wire_thickness": 6.0,
       "field_names": [],
+      "intersheets_ref_own_page": false,
       "intersheets_ref_prefix": "",
       "intersheets_ref_short": false,
       "intersheets_ref_show": false,
@@ -405,6 +408,13 @@
       "version": 0
     },
     "net_format_name": "",
+    "ngspice": {
+      "meta": {
+        "version": 0
+      },
+      "model_mode": 0,
+      "workbook_filename": ""
+    },
     "page_layout_descr_file": "",
     "plot_directory": "",
     "spice_adjust_passive_values": false,
@@ -414,7 +424,7 @@
   },
   "sheets": [
     [
-      "29e1ecc4-3bd8-490c-a90d-fa647cc1735d",
+      "3c99618c-33dd-42c5-bfb1-f58a948a00df",
       ""
     ]
   ],

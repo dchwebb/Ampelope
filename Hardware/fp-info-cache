@@ -1,4 +1,4 @@
-19483127123977408
+19484742504162655
 Audio_Module
 Reverb_BTDR-1H
 Digital Reverberation Unit, http://www.belton.co.kr/inc/downfile.php?seq=17&file=pdf (footprint from http://www.uk-electronic.de/PDF/BTDR-1.pdf)
@@ -49370,6 +49370,13 @@ connector multicomp MC9A MC9A12
 0
 16
 16
+Custom_Footprints
+FBGA-24
+
+
+0
+24
+24
 Custom_Footprints
 ICE40_QFN-48-1EP_7x7mm_Pitch0.5mm
 UK Package; 48-Lead Plastic QFN (7mm x 7mm); (see Linear Technology QFN_48_05-08-1704.pdf)
