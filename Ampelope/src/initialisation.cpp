@@ -38,6 +38,41 @@ void SystemClock_Config(void) {
 	RCC->CFGR |= RCC_CFGR_PPRE2_DIV1;			// PCLK2 = HCLK / 1 (APB2)
 }
 
+void InitSysTick()
+{
+	// Register macros found in core_cm4.h
+	SysTick->CTRL = 0;								// Disable SysTick
+	SysTick->LOAD = 0xFFFF - 1;						// Set reload register to maximum 2^24 - each tick is around 400us
+
+	// Set priority of Systick interrupt to least urgency (ie largest priority value)
+	NVIC_SetPriority (SysTick_IRQn, (1 << __NVIC_PRIO_BITS) - 1);
+
+	SysTick->VAL = 0;								// Reset the SysTick counter value
+
+	SysTick->CTRL |= SysTick_CTRL_CLKSOURCE_Msk;	// Select processor clock: 1 = processor clock; 0 = external clock
+	SysTick->CTRL |= SysTick_CTRL_TICKINT_Msk;		// Enable SysTick interrupt
+	SysTick->CTRL |= SysTick_CTRL_ENABLE_Msk;		// Enable SysTick
+}
+
+void InitDAC()
+{
+	// p789 - opamp - use follower mode? p792
+	//	OPAMP1_VINP		DAC3_CH1	PA1 (VINP0)  / PA3 (VINP1)  / PA7 (VINP2)
+	//	OPAMP3_VINP		DAC3_CH2	PB0 (VINP0)  / PB13 (VINP1) / PA1 (VINP2)
+	//	x OPAMP4_VINP		DAC4_CH1	PB13 (VINP0) / [PB11 (VINP2)]
+	//	x OPAMP5_VINP		DAC4_CH2	PB14 (VINP0) / [PC3 (VINP2)]
+	//	x OPAMP6_VINP		DAC3_CH1	PB13 (VINP2) / [PB12 (VINP0)]
+
+	// Once the DAC channelx is enabled, the corresponding GPIO pin (PA4 DAC1_OUT1 or PA5 DAC1_OUT2) is automatically connected to the analog converter output (DAC_OUTx).
+	RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN;			// Enable GPIO Clock
+	RCC->AHB2ENR |= RCC_AHB2ENR_DAC1EN;				// Enable DAC Clock
+
+	DAC->MCR &= ~DAC_MCR_MODE1_Msk;					// Set to normal mode: DAC channel1 is connected to external pin with Buffer enabled
+	DAC->CR |= DAC_CR_EN1;							// Enable DAC using PA4 (DAC_OUT1)
+
+	// output triggered with DAC->DHR12R1 = x;
+}
+
 /*
 void InitIO()
 {
@@ -52,21 +87,7 @@ void InitIO()
 
 }
 
-void InitSysTick()
-{
-	// Register macros found in core_cm4.h
-	SysTick->CTRL = 0;									// Disable SysTick
-	SysTick->LOAD = 0xFFFF - 1;							// Set reload register to maximum 2^24 - each tick is around 400us
 
-	// Set priority of Systick interrupt to least urgency (ie largest priority value)
-	NVIC_SetPriority (SysTick_IRQn, (1 << __NVIC_PRIO_BITS) - 1);
-
-	SysTick->VAL = 0;									// Reset the SysTick counter value
-
-	SysTick->CTRL |= SysTick_CTRL_CLKSOURCE_Msk;		// Select processor clock: 1 = processor clock; 0 = external clock
-	SysTick->CTRL |= SysTick_CTRL_TICKINT_Msk;			// Enable SysTick interrupt
-	SysTick->CTRL |= SysTick_CTRL_ENABLE_Msk;			// Enable SysTick
-}
 
 //	Setup Timer 3 on an interrupt to trigger sample acquisition
 void InitSampleAcquisition() {
@@ -187,18 +208,7 @@ void InitMidiUART() {
 }
 
 
-void InitDAC()
-{
-	// Once the DAC channelx is enabled, the corresponding GPIO pin (PA4 or PA5) is automatically connected to the analog converter output (DAC_OUTx).
-	// Enable DAC and GPIO Clock
-	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;			// Enable GPIO Clock
-	RCC->APB1ENR |= RCC_APB1ENR_DACEN;				// Enable DAC Clock
 
-	DAC->CR |= DAC_CR_EN1;							// Enable DAC using PA4 (DAC_OUT1)
-	DAC->CR |= DAC_CR_BOFF1;						// Enable DAC channel output buffer to reduce the output impedance
-
-	// output triggered with DAC->DHR12R1 = x;
-}
 */
 
 

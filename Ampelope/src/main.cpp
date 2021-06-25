@@ -13,7 +13,8 @@ int main(void)
 	SystemInit();							// Activates floating point coprocessor and resets clock
 	SystemClock_Config();					// Configure the clock and PLL
 	SystemCoreClockUpdate();				// Update SystemCoreClock (system clock frequency) derived from settings of oscillators, prescalers and PLL
-//	InitSysTick();
+	InitSysTick();
+	InitDAC();
 
 	while (1)
 	{
