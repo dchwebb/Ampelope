@@ -181,4 +181,4 @@ PA3.GPIO_Label=LPUART1_RX [STLINKV3E_VCP_TX]
 PA3.Signal=LPUART1_RX
 PA2.Locked=true
 PB3.GPIO_Label=T_SWO
-isbadioc=true
+isbadioc=false

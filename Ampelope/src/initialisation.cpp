@@ -70,6 +70,9 @@ void InitDAC()
 	DAC->MCR &= ~DAC_MCR_MODE1_Msk;					// Set to normal mode: DAC channel1 is connected to external pin with Buffer enabled
 	DAC->CR |= DAC_CR_EN1;							// Enable DAC using PA4 (DAC_OUT1)
 
+	DAC->MCR &= ~DAC_MCR_MODE2_Msk;					// Set to normal mode: DAC channel1 is connected to external pin with Buffer enabled
+	DAC->CR |= DAC_CR_EN2;							// Enable DAC using PA4 (DAC_OUT1)
+
 	// output triggered with DAC->DHR12R1 = x;
 }
 

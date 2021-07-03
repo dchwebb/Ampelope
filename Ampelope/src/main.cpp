@@ -16,8 +16,21 @@ int main(void)
 	InitSysTick();
 	InitDAC();
 
+	uint16_t x = 0;
+	uint16_t attack, decay, sustain, release;
+	uint16_t attackCount;
+	uint16_t decayCount;
+	uint16_t releaseCount;
+
 	while (1)
 	{
+		x++;
+		if (x == 4096) {
+			x = 0;
+		}
+		DAC->DHR12R1 = x;
+		DAC->DHR12R2 = 4095 - x;
+
 
 	}
 }
