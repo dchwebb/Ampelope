@@ -40,18 +40,22 @@ void SystemClock_Config(void) {
 
 void InitSysTick()
 {
-	// Register macros found in core_cm4.h
-	SysTick->CTRL = 0;								// Disable SysTick
-	SysTick->LOAD = 0xFFFF - 1;						// Set reload register to maximum 2^24 - each tick is around 400us
+//	// Register macros found in core_cm4.h
+//	SysTick->CTRL = 0;								// Disable SysTick
+//	SysTick->LOAD = 0xFFFF - 1;						// Set reload register to maximum 2^24 - each tick is around 400us
+//
+//	// Set priority of Systick interrupt to least urgency (ie largest priority value)
+//	NVIC_SetPriority (SysTick_IRQn, (1 << __NVIC_PRIO_BITS) - 1);
+//
+//	SysTick->VAL = 0;								// Reset the SysTick counter value
+//
+//	SysTick->CTRL |= SysTick_CTRL_CLKSOURCE_Msk;	// Select processor clock: 1 = processor clock; 0 = external clock
+//	SysTick->CTRL |= SysTick_CTRL_TICKINT_Msk;		// Enable SysTick interrupt
+//	SysTick->CTRL |= SysTick_CTRL_ENABLE_Msk;		// Enable SysTick
 
-	// Set priority of Systick interrupt to least urgency (ie largest priority value)
-	NVIC_SetPriority (SysTick_IRQn, (1 << __NVIC_PRIO_BITS) - 1);
+	SysTick_Config(SystemCoreClock / SYSTICK);		// gives 1ms
+	NVIC_SetPriority(SysTick_IRQn, 0);
 
-	SysTick->VAL = 0;								// Reset the SysTick counter value
-
-	SysTick->CTRL |= SysTick_CTRL_CLKSOURCE_Msk;	// Select processor clock: 1 = processor clock; 0 = external clock
-	SysTick->CTRL |= SysTick_CTRL_TICKINT_Msk;		// Enable SysTick interrupt
-	SysTick->CTRL |= SysTick_CTRL_ENABLE_Msk;		// Enable SysTick
 }
 
 void InitDAC()
@@ -70,33 +74,30 @@ void InitDAC()
 	DAC->MCR &= ~DAC_MCR_MODE1_Msk;					// Set to normal mode: DAC channel1 is connected to external pin with Buffer enabled
 	DAC->CR |= DAC_CR_EN1;							// Enable DAC using PA4 (DAC_OUT1)
 
-	DAC->MCR &= ~DAC_MCR_MODE2_Msk;					// Set to normal mode: DAC channel1 is connected to external pin with Buffer enabled
-	DAC->CR |= DAC_CR_EN2;							// Enable DAC using PA4 (DAC_OUT1)
+	DAC->MCR &= ~DAC_MCR_MODE2_Msk;					// Set to normal mode: DAC channel2 is connected to external pin with Buffer enabled
+	DAC->CR |= DAC_CR_EN2;							// Enable DAC using PA5 (DAC_OUT2)
 
 	// output triggered with DAC->DHR12R1 = x;
 }
 
-/*
+
 void InitIO()
 {
-	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;			// reset and clock control - advanced high performance bus - GPIO port A
-	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;			// reset and clock control - advanced high performance bus - GPIO port B
-	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;			// reset and clock control - advanced high performance bus - GPIO port C
+	// MODER 00: Input mode, 01: General purpose output mode, 10: Alternate function mode, 11: Analog mode (reset state)
 
-	// configure PC13 blue button
-	//GPIOC->PUPDR |= GPIO_PUPDR_PUPDR13_0;			// Set pin to pull up:  01 Pull-up; 10 Pull-down; 11 Reserved
+	RCC->AHB2ENR |= RCC_AHB2ENR_GPIOCEN;			// reset and clock control - advanced high performance bus - GPIO port C
 
-	//GPIOA->MODER |= GPIO_MODER_MODER7_0;			// Set to output
 
+	GPIOC->MODER &= ~GPIO_MODER_MODER8;				// configure PC8 gate input
+	GPIOC->MODER &= ~GPIO_MODER_MODER6_1;				// configure PC6 debug out
 }
 
 
-
 //	Setup Timer 3 on an interrupt to trigger sample acquisition
-void InitSampleAcquisition() {
-	RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;				// Enable Timer 3
-	TIM3->PSC = 50;									// Set prescaler
-	TIM3->ARR = 140; 								// Set auto reload register
+void InitEnvTimer() {
+	RCC->APB1ENR1 |= RCC_APB1ENR1_TIM3EN;			// Enable Timer 3
+	TIM3->PSC = 34;									// Set prescaler
+	TIM3->ARR = 103; 								// Set auto reload register
 
 	TIM3->DIER |= TIM_DIER_UIE;						// DMA/interrupt enable register
 	NVIC_EnableIRQ(TIM3_IRQn);
@@ -105,6 +106,8 @@ void InitSampleAcquisition() {
 	TIM3->CR1 |= TIM_CR1_CEN;
 	TIM3->EGR |= TIM_EGR_UG;						//  Re-initializes counter and generates update of registers
 }
+
+/*
 
 //	Setup Timer 9 to count clock cycles for coverage profiling
 void InitCoverageTimer() {
