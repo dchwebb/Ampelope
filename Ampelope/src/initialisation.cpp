@@ -89,7 +89,7 @@ void InitIO()
 
 
 	GPIOC->MODER &= ~GPIO_MODER_MODER8;				// configure PC8 gate input
-	GPIOC->MODER &= ~GPIO_MODER_MODER6_1;				// configure PC6 debug out
+	GPIOC->MODER &= ~GPIO_MODER_MODER6_1;			// configure PC6 debug out
 }
 
 
@@ -107,8 +107,134 @@ void InitEnvTimer() {
 	TIM3->EGR |= TIM_EGR_UG;						//  Re-initializes counter and generates update of registers
 }
 
-/*
 
+void InitAdcPins(ADC_TypeDef* ADC_No, std::initializer_list<uint8_t> channels) {
+	uint8_t sequence = 1;
+
+	for (auto channel: channels) {
+		// Set conversion sequence to order ADC channels are passed to this function
+		if (sequence < 5) {
+			ADC_No->SQR1 |= channel << ((sequence) * 6);
+		} else if (sequence < 10) {
+			ADC_No->SQR2 |= channel << ((sequence - 5) * 6);
+		} else if (sequence < 15) {
+			ADC_No->SQR3 |= channel << ((sequence - 10) * 6);
+		} else {
+			ADC_No->SQR4 |= channel << ((sequence - 15) * 6);
+		}
+
+		// 000: 3 cycles, 001: 15 cycles, 010: 28 cycles, 011: 56 cycles, 100: 84 cycles, 101: 112 cycles, 110: 144 cycles, 111: 480 cycles
+		if (channel < 10)
+			ADC_No->SMPR1 |= 0b010 << (3 * channel);
+		else
+			ADC_No->SMPR2 |= 0b010 << (3 * (channel - 10));
+
+		sequence++;
+	}
+}
+
+
+void InitADC()
+{
+	// Initialize Clocks
+	RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;
+	RCC->AHB1ENR |= RCC_AHB1ENR_DMAMUX1EN;
+	RCC->AHB2ENR |= RCC_AHB2ENR_ADC12EN;
+	RCC->CCIPR |= RCC_CCIPR_ADC12SEL_1;				// 00: pll2_p_ck (default), 01: pll3_r_ck clock, 10: per_ck clock
+
+	DMA1_Channel1->CCR &= ~DMA_CCR_EN;
+	DMA1_Channel1->CCR |= DMA_CCR_CIRC;				// Circular mode to keep refilling buffer
+	DMA1_Channel1->CCR |= DMA_CCR_MINC;				// Memory in increment mode
+	DMA1_Channel1->CCR |= DMA_CCR_PSIZE_0;			// Peripheral size: 8 bit; 01 = 16 bit; 10 = 32 bit
+	DMA1_Channel1->CCR |= DMA_CCR_MSIZE_0;			// Memory size: 8 bit; 01 = 16 bit; 10 = 32 bit
+	DMA1_Channel1->CCR |= DMA_CCR_PL_0;				// Priority: 00 = low; 01 = Medium; 10 = High; 11 = Very High
+
+//	DMA1_Channel1->FCR &= ~DMA_SxFCR_FTH;			// Disable FIFO Threshold selection
+	DMA1->IFCR = 0x3F << DMA_IFCR_CGIF1_Pos;		// clear all five interrupts for this stream
+
+	DMAMUX1_Channel0->CCR |= 5; 					// DMA request MUX input 5 = ADC1 (See p.427)
+	DMAMUX1_ChannelStatus->CFR |= DMAMUX_CFR_CSOF0; // Channel 1 Clear synchronization overrun event flag
+
+	ADC1->CR &= ~ADC_CR_DEEPPWD;					// Deep power down: 0: ADC not in deep-power down	1: ADC in deep-power-down (default reset state)
+	ADC1->CR |= ADC_CR_ADVREGEN;					// Enable ADC internal voltage regulator
+
+	// Wait until voltage regulator settled
+	volatile uint32_t wait_loop_index = (SystemCoreClock / (100000UL * 2UL));
+	while (wait_loop_index != 0UL) {
+		wait_loop_index--;
+	}
+	while ((ADC1->CR & ADC_CR_ADVREGEN) != ADC_CR_ADVREGEN) {}
+
+	ADC12_COMMON->CCR |= ADC_CCR_CKMODE;			// adc_hclk/4 (Synchronous clock mode)
+	ADC1->CFGR |= ADC_CFGR_CONT;					// 1: Continuous conversion mode for regular conversions
+	ADC1->CFGR |= ADC_CFGR_OVRMOD;					// Overrun Mode 1: ADC_DR register is overwritten with the last conversion result when an overrun is detected.
+	ADC1->CFGR |= ADC_CFGR_DMACFG;					// 0: DMA One Shot Mode selected, 1: DMA Circular Mode selected
+	ADC1->CFGR |= ADC_CFGR_DMAEN;					// Enable ADC DMA
+
+	// For scan mode: set number of channels to be converted
+	ADC1->SQR1 |= (ADC_BUFFER_LENGTH - 1);
+
+	// Start calibration
+	ADC1->CR &= ~ADC_CR_ADCALDIF;						// Calibration in single ended mode
+	ADC1->CR |= ADC_CR_ADCAL;
+	while ((ADC1->CR & ADC_CR_ADCAL) == ADC_CR_ADCAL) {};
+
+
+	/*--------------------------------------------------------------------------------------------
+	Configure ADC Channels to be converted:
+	0	PC0 ADC12_IN6		Attack
+	1	PC1 ADC12_IN7		Decay
+
+	PC0 ADC12_IN6
+	PC1 ADC12_IN7
+	PC2 ADC12_IN8
+	PC3 ADC12_IN9
+	PA0 ADC12_IN1
+	PA1 ADC12_IN2
+	PA2 ADC1_IN3
+	PA3 ADC1_IN4
+	PA4 ADC2_IN17 x:DAC
+	PA5 ADC2_IN13 x:DAC
+	PA6 ADC2_IN3
+	PA7 ADC2_IN4
+	PC4 ADC2_IN5
+	PC5 ADC2_IN11
+	PB0 ADC1_IN15
+	PB1 ADC1_IN12
+	PB2 ADC2_IN12
+	PB11 ADC12_IN14
+	PB12 ADC1_IN11
+	PB14 ADC1_IN5
+	PB15 ADC2_IN15
+
+
+	*/
+	InitAdcPins(ADC1, {6, 7});
+
+
+	// Enable ADC
+	ADC1->CR |= ADC_CR_ADEN;
+	while ((ADC1->ISR & ADC_ISR_ADRDY) == 0) {}
+
+	DMAMUX1_ChannelStatus->CFR |= DMAMUX_CFR_CSOF0; // Channel 1 Clear synchronization overrun event flag
+	DMA1->IFCR = 0x3F << DMA_IFCR_CGIF1_Pos;		// clear all five interrupts for this stream
+
+	DMA1_Channel1->CNDTR |= ADC_BUFFER_LENGTH;		// Number of data items to transfer (ie size of ADC buffer)
+	DMA1_Channel1->CPAR = (uint32_t)(&(ADC1->DR));	// Configure the peripheral data register address 0x40022040
+	DMA1_Channel1->CMAR = (uint32_t)(ADC_array);	// Configure the memory address (note that M1AR is used for double-buffer mode) 0x24000040
+
+	DMA1_Channel1->CCR |= DMA_CCR_EN;				// Enable DMA and wait
+	wait_loop_index = (SystemCoreClock / (100000UL * 2UL));
+	while (wait_loop_index != 0UL) {
+	  wait_loop_index--;
+	}
+
+	ADC1->CR |= ADC_CR_ADSTART;						// Start ADC
+}
+
+
+
+/*
 //	Setup Timer 9 to count clock cycles for coverage profiling
 void InitCoverageTimer() {
 	RCC->APB2ENR |= RCC_APB2ENR_TIM9EN;				// Enable Timer
@@ -127,93 +253,6 @@ void InitDebounceTimer() {
 	TIM5->PSC = 10000;
 	TIM5->ARR = 65535;
 }
-
-
-void InitEncoders() {
-	// L Encoder: button on PA10, up/down on PB6 and PB7; R Encoder: Button on PB13, up/down on PC6 and PC7
-	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;			// reset and clock control - advanced high performance bus - GPIO port A
-	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;			// reset and clock control - advanced high performance bus - GPIO port B
-	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;			// reset and clock control - advanced high performance bus - GPIO port C
-	RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;			// Enable system configuration clock: used to manage external interrupt line connection to GPIOs
-
-	// configure PA10 button to fire on an interrupt
-	GPIOA->PUPDR |= GPIO_PUPDR_PUPDR10_0;			// Set pin to pull up:  01 Pull-up; 10 Pull-down; 11 Reserved
-	SYSCFG->EXTICR[2] |= SYSCFG_EXTICR3_EXTI10_PA;	// Select Pin PA10 which uses External interrupt 2
-	EXTI->RTSR |= EXTI_RTSR_TR10;					// Enable rising edge trigger
-	EXTI->FTSR |= EXTI_FTSR_TR10;					// Enable falling edge trigger
-	EXTI->IMR |= EXTI_IMR_MR10;						// Activate interrupt using mask register
-
-	// configure PB13 button to fire on an interrupt
-	GPIOB->PUPDR |= GPIO_PUPDR_PUPDR13_0;			// Set pin to pull up:  01 Pull-up; 10 Pull-down; 11 Reserved
-	SYSCFG->EXTICR[3] |= SYSCFG_EXTICR4_EXTI13_PB;	// Select Pin PB4 which uses External interrupt 2
-	EXTI->RTSR |= EXTI_RTSR_TR13;					// Enable rising edge trigger
-	EXTI->FTSR |= EXTI_FTSR_TR13;					// Enable falling edge trigger
-	EXTI->IMR |= EXTI_IMR_MR13;						// Activate interrupt using mask register
-
-	// L Encoder using timer functionality - PB6 and PB7
-	GPIOB->PUPDR |= GPIO_PUPDR_PUPDR6_0;			// Set pin to pull up:  01 Pull-up; 10 Pull-down; 11 Reserved
-	GPIOB->MODER |= GPIO_MODER_MODER6_1;			// Set alternate function
-	GPIOB->AFR[0] |= 2 << 24;						// Alternate function 2 is TIM4_CH1
-
-	GPIOB->PUPDR |= GPIO_PUPDR_PUPDR7_0;			// Set pin to pull up:  01 Pull-up; 10 Pull-down; 11 Reserved
-	GPIOB->MODER |= GPIO_MODER_MODER7_1;			// Set alternate function
-	GPIOB->AFR[0] |= 2 << 28;						// Alternate function 2 is TIM4_CH2
-
-	RCC->APB1ENR |= RCC_APB1ENR_TIM4EN;				// Enable Timer 4
-	TIM4->PSC = 0;									// Set prescaler
-	TIM4->ARR = 0xFFFF; 							// Set auto reload register to max
-	TIM4->SMCR |= TIM_SMCR_SMS_0 |TIM_SMCR_SMS_1;	// SMS=011 for counting on both TI1 and TI2 edges
-	TIM4->SMCR |= TIM_SMCR_ETF;						// Enable digital filter
-	TIM4->CNT = 32000;								// Start counter at mid way point
-	TIM4->CR1 |= TIM_CR1_CEN;
-
-	// R Encoder using timer functionality - PC6 and PC7
-	GPIOC->PUPDR |= GPIO_PUPDR_PUPDR6_0;			// Set pin to pull up:  01 Pull-up; 10 Pull-down; 11 Reserved
-	GPIOC->MODER |= GPIO_MODER_MODER6_1;			// Set alternate function
-	GPIOC->AFR[0] |= 3 << 24;						// Alternate function 3 is TIM8_CH1
-
-	GPIOC->PUPDR |= GPIO_PUPDR_PUPDR7_0;			// Set pin to pull up:  01 Pull-up; 10 Pull-down; 11 Reserved
-	GPIOC->MODER |= GPIO_MODER_MODER7_1;			// Set alternate function
-	GPIOC->AFR[0] |= 3 << 28;						// Alternate function 3 is TIM8_CH2
-
-	RCC->APB2ENR |= RCC_APB2ENR_TIM8EN;				// Enable Timer 8
-	TIM8->PSC = 0;									// Set prescaler
-	TIM8->ARR = 0xFFFF; 							// Set auto reload register to max
-	TIM8->SMCR |= TIM_SMCR_SMS_0 |TIM_SMCR_SMS_1;	// SMS=011 for counting on both TI1 and TI2 edges
-	TIM8->SMCR |= TIM_SMCR_ETF;						// Enable digital filter
-	TIM8->CNT = 32000;								// Start counter at mid way point
-	TIM8->CR1 |= TIM_CR1_CEN;
-
-
-	NVIC_SetPriority(EXTI15_10_IRQn, 4);			// Lower is higher priority
-	NVIC_EnableIRQ(EXTI15_10_IRQn);
-
-}
-
-void InitMidiUART() {
-	// PC11 UART4_RX 79
-	// [PA1  UART4_RX 24 (AF8) ** NB Dev board seems to have something pulling this pin to ground so can't use]
-
-	RCC->APB1ENR |= RCC_APB1ENR_UART4EN;			// UART4 clock enable
-
-	GPIOC->MODER |= GPIO_MODER_MODER11_1;			// Set alternate function on PC11
-	GPIOC->AFR[1] |= 0b1000 << 12;					// Alternate function on PC11 for UART4_RX is 1000: AF8
-
-	int Baud = (SystemCoreClock / 4) / (16 * 31250);
-	UART4->BRR |= Baud << 4;						// Baud Rate (called USART_BRR_DIV_Mantissa) = (Sys Clock: 180MHz / APB1 Prescaler DIV4: 45MHz) / (16 * 31250) = 90
-	UART4->CR1 &= ~USART_CR1_M;						// Clear bit to set 8 bit word length
-	UART4->CR1 |= USART_CR1_RE;						// Receive enable
-
-	// Set up interrupts
-	UART4->CR1 |= USART_CR1_RXNEIE;
-	NVIC_SetPriority(UART4_IRQn, 3);				// Lower is higher priority
-	NVIC_EnableIRQ(UART4_IRQn);
-
-	UART4->CR1 |= USART_CR1_UE;						// USART Enable
-
-}
-
-
 
 */
 

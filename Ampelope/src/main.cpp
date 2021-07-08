@@ -2,6 +2,7 @@
 #include "envelope.h"
 
 volatile uint32_t SysTickVal;
+volatile uint16_t ADC_array[ADC_BUFFER_LENGTH];
 
 uint16_t x = 0;
 Envelope envelope;
@@ -21,7 +22,7 @@ int main(void)
 	InitDAC();
 	InitIO();
 	InitEnvTimer();
-
+	InitADC();
 
 	while (1)
 	{
