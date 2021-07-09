@@ -60,15 +60,10 @@ void InitSysTick()
 
 void InitDAC()
 {
-	// p789 - opamp - use follower mode? p792
-	//	OPAMP1_VINP		DAC3_CH1	PA1 (VINP0)  / PA3 (VINP1)  / PA7 (VINP2)
-	//	OPAMP3_VINP		DAC3_CH2	PB0 (VINP0)  / PB13 (VINP1) / PA1 (VINP2)
-	//	x OPAMP4_VINP		DAC4_CH1	PB13 (VINP0) / [PB11 (VINP2)]
-	//	x OPAMP5_VINP		DAC4_CH2	PB14 (VINP0) / [PC3 (VINP2)]
-	//	x OPAMP6_VINP		DAC3_CH1	PB13 (VINP2) / [PB12 (VINP0)]
+	// Configure 4 DAC outputs PA4 and PA5 are regular DAC1 buffered outputs; PA2 and PB1 are DAC3 via OpAmp1 and OpAmp3 (Manual p.789)
 
-	// Once the DAC channelx is enabled, the corresponding GPIO pin (PA4 DAC1_OUT1 or PA5 DAC1_OUT2) is automatically connected to the analog converter output (DAC_OUTx).
 	RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN;			// Enable GPIO Clock
+	RCC->AHB2ENR |= RCC_AHB2ENR_GPIOBEN;			// Enable GPIO Clock
 	RCC->AHB2ENR |= RCC_AHB2ENR_DAC1EN;				// Enable DAC Clock
 	RCC->AHB2ENR |= RCC_AHB2ENR_DAC3EN;				// Enable DAC Clock
 
@@ -80,13 +75,22 @@ void InitDAC()
 
 	// output triggered with DAC->DHR12R1 = x;
 
-	// Opamp for DAC3: Follower configuration mode - output on PA2
+	// Opamp for DAC3 Channel 1: Follower configuration mode - output on PA2
 	DAC3->MCR |= DAC_MCR_MODE1_0 | DAC_MCR_MODE1_1;	// 011: DAC channel1 is connected to on chip peripherals with Buffer disabled
 	DAC3->CR |= DAC_CR_EN1;							// Enable DAC
 
 	OPAMP1->CSR |= OPAMP_CSR_VMSEL;					// 11: Opamp_out connected to OPAMPx_VINM input
 	OPAMP1->CSR |= OPAMP_CSR_VPSEL;					// 11: DAC3_CH1  connected to OPAMP1 VINP input
 	OPAMP1->CSR |= OPAMP_CSR_OPAMPxEN;				// Enable OpAmp: voltage on pin OPAMPx_VINP is buffered to pin OPAMPx_VOUT (PA2)
+
+	// Opamp for DAC3 Channel 2: Follower configuration mode - output on PB1
+	// NB According to manual p.790 this should only work on category 3/4 devices and STM32G431 is category 2, but tested working
+	DAC3->MCR |= DAC_MCR_MODE2_0 | DAC_MCR_MODE2_1;	// 011: DAC channel2 is connected to on chip peripherals with Buffer disabled
+	DAC3->CR |= DAC_CR_EN2;							// Enable DAC
+
+	OPAMP3->CSR |= OPAMP_CSR_VMSEL;					// 11: Opamp_out connected to OPAMPx_VINM input
+	OPAMP3->CSR |= OPAMP_CSR_VPSEL;					// 11: DAC3_CH2  connected to OPAMP1 VINP input
+	OPAMP3->CSR |= OPAMP_CSR_OPAMPxEN;				// Enable OpAmp: voltage on pin OPAMPx_VINP is buffered to pin OPAMPx_VOUT (PB1)
 
 }
 
@@ -96,7 +100,6 @@ void InitIO()
 	// MODER 00: Input mode, 01: General purpose output mode, 10: Alternate function mode, 11: Analog mode (reset state)
 
 	RCC->AHB2ENR |= RCC_AHB2ENR_GPIOCEN;			// reset and clock control - advanced high performance bus - GPIO port C
-
 
 	GPIOC->MODER &= ~GPIO_MODER_MODER8;				// configure PC8 gate input
 	GPIOC->MODER &= ~GPIO_MODER_MODER6_1;			// configure PC6 debug out
@@ -200,16 +203,16 @@ void InitADC()
 	PC3 ADC12_IN9
 	PA0 ADC12_IN1
 	PA1 ADC12_IN2
-	PA2 ADC1_IN3
+	[PA2 ADC1_IN3 DAC]
 	PA3 ADC1_IN4
-	PA4 ADC2_IN17 x:DAC
-	PA5 ADC2_IN13 x:DAC
+	[PA4 ADC2_IN17 DAC]
+	[PA5 ADC2_IN13 DAC]
 	PA6 ADC2_IN3
 	PA7 ADC2_IN4
 	PC4 ADC2_IN5
 	PC5 ADC2_IN11
 	PB0 ADC1_IN15
-	PB1 ADC1_IN12
+	[PB1 ADC1_IN12 DAC]
 	PB2 ADC2_IN12
 	PB11 ADC12_IN14
 	PB12 ADC1_IN11
