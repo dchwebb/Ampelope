@@ -70,14 +70,24 @@ void InitDAC()
 	// Once the DAC channelx is enabled, the corresponding GPIO pin (PA4 DAC1_OUT1 or PA5 DAC1_OUT2) is automatically connected to the analog converter output (DAC_OUTx).
 	RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN;			// Enable GPIO Clock
 	RCC->AHB2ENR |= RCC_AHB2ENR_DAC1EN;				// Enable DAC Clock
+	RCC->AHB2ENR |= RCC_AHB2ENR_DAC3EN;				// Enable DAC Clock
 
-	DAC->MCR &= ~DAC_MCR_MODE1_Msk;					// Set to normal mode: DAC channel1 is connected to external pin with Buffer enabled
-	DAC->CR |= DAC_CR_EN1;							// Enable DAC using PA4 (DAC_OUT1)
+	DAC1->MCR &= ~DAC_MCR_MODE1_Msk;				// Set to normal mode: DAC channel1 is connected to external pin with Buffer enabled
+	DAC1->CR |= DAC_CR_EN1;							// Enable DAC using PA4 (DAC_OUT1)
 
-	DAC->MCR &= ~DAC_MCR_MODE2_Msk;					// Set to normal mode: DAC channel2 is connected to external pin with Buffer enabled
-	DAC->CR |= DAC_CR_EN2;							// Enable DAC using PA5 (DAC_OUT2)
+	DAC1->MCR &= ~DAC_MCR_MODE2_Msk;				// Set to normal mode: DAC channel2 is connected to external pin with Buffer enabled
+	DAC1->CR |= DAC_CR_EN2;							// Enable DAC using PA5 (DAC_OUT2)
 
 	// output triggered with DAC->DHR12R1 = x;
+
+	// Opamp for DAC3: Follower configuration mode - output on PA2
+	DAC3->MCR |= DAC_MCR_MODE1_0 | DAC_MCR_MODE1_1;	// 011: DAC channel1 is connected to on chip peripherals with Buffer disabled
+	DAC3->CR |= DAC_CR_EN1;							// Enable DAC
+
+	OPAMP1->CSR |= OPAMP_CSR_VMSEL;					// 11: Opamp_out connected to OPAMPx_VINM input
+	OPAMP1->CSR |= OPAMP_CSR_VPSEL;					// 11: DAC3_CH1  connected to OPAMP1 VINP input
+	OPAMP1->CSR |= OPAMP_CSR_OPAMPxEN;				// Enable OpAmp: voltage on pin OPAMPx_VINP is buffered to pin OPAMPx_VOUT (PA2)
+
 }
 
 
@@ -149,7 +159,6 @@ void InitADC()
 	DMA1_Channel1->CCR |= DMA_CCR_MSIZE_0;			// Memory size: 8 bit; 01 = 16 bit; 10 = 32 bit
 	DMA1_Channel1->CCR |= DMA_CCR_PL_0;				// Priority: 00 = low; 01 = Medium; 10 = High; 11 = Very High
 
-//	DMA1_Channel1->FCR &= ~DMA_SxFCR_FTH;			// Disable FIFO Threshold selection
 	DMA1->IFCR = 0x3F << DMA_IFCR_CGIF1_Pos;		// clear all five interrupts for this stream
 
 	DMAMUX1_Channel0->CCR |= 5; 					// DMA request MUX input 5 = ADC1 (See p.427)
@@ -175,7 +184,7 @@ void InitADC()
 	ADC1->SQR1 |= (ADC_BUFFER_LENGTH - 1);
 
 	// Start calibration
-	ADC1->CR &= ~ADC_CR_ADCALDIF;						// Calibration in single ended mode
+	ADC1->CR &= ~ADC_CR_ADCALDIF;					// Calibration in single ended mode
 	ADC1->CR |= ADC_CR_ADCAL;
 	while ((ADC1->CR & ADC_CR_ADCAL) == ADC_CR_ADCAL) {};
 
@@ -226,7 +235,7 @@ void InitADC()
 	DMA1_Channel1->CCR |= DMA_CCR_EN;				// Enable DMA and wait
 	wait_loop_index = (SystemCoreClock / (100000UL * 2UL));
 	while (wait_loop_index != 0UL) {
-	  wait_loop_index--;
+		wait_loop_index--;
 	}
 
 	ADC1->CR |= ADC_CR_ADSTART;						// Start ADC
