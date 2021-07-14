@@ -1,12 +1,13 @@
 #include "initialisation.h"
 #include "envelope.h"
+#include "usb.h"
 
 volatile uint32_t SysTickVal;
 volatile uint16_t ADC_array[ADC_BUFFER_LENGTH];
 
 uint16_t x = 0;
 Envelope envelope;
-
+USBHandler usb;
 
 extern "C" {
 #include "interrupts.h"
@@ -23,6 +24,8 @@ int main(void)
 	InitIO();
 	InitEnvTimer();
 	InitADC();
+
+	usb.InitUSB();
 
 	while (1)
 	{

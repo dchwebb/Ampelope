@@ -13,6 +13,10 @@ void TIM3_IRQHandler() {
 	}
 }
 
+void USB_LP_IRQHandler() {
+	usb.USBInterruptHandler();
+}
+
 void NMI_Handler(void) {}
 
 void HardFault_Handler(void) {
