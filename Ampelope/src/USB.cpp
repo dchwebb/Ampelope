@@ -174,7 +174,14 @@ void USBHandler::USB_EPStartXfer(Direction direction, uint8_t endpoint, uint32_t
 		}
 		// configure and validate Rx endpoint
 		//PCD_SET_EP_RX_CNT(USBx, ep->num, len);
+		if (len == 0) {
+			USB_PMA->COUNT0_RX &= ~USB_COUNT0_RX_NUM_BLOCK;					// configure block size = 1 (32 Bytes); number of blocks = 2 (64 bytes)
+		} else {
+			USB_PMA->COUNT0_RX |= (1 << USB_COUNT0_RX_NUM_BLOCK_Pos);		// configure block size = 1 (32 Bytes); number of blocks = 2 (64 bytes)
+		}
+
 		//PCD_SET_EP_RX_STATUS(USBx, ep->num, USB_EP_RX_VALID);
+		USB->EP0R ^= USB_EP_RX_VALID;
 	}
 }
 
@@ -509,8 +516,12 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 					//ep = &hpcd->IN_ep[0];
 
 					//xfer_count = PCD_EP_TX_CNT(0);
-					xfer_count = USB_PMA->COUNT0_TX;
-					//ep->xfer_buff += xfer_count;
+					xfer_count = USB_PMA->COUNT0_TX & USB_COUNT0_TX_COUNT0_TX_Msk;
+					xfer_buff += xfer_count;
+
+					// Sets TX status to stall, then eventually calls USB_EPStartXfer
+					USB->EP0R ^= USB_EP_TX_STALL;
+					USB_EPStartXfer(Direction::out, 0, 0);
 
 					// TX COMPLETE
 					//HAL_PCD_DataInStageCallback(hpcd, 0U);
@@ -607,7 +618,7 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 		USB_PMA->ADDR0_TX = 0x58;						// Offset of PMA used for EP0 TX
 		//USB_PMA->COUNT0_TX = 0x1C;
 		USB_PMA->ADDR0_RX = 0x18;						// Offset of PMA used for EP0 RX
-		USB_PMA->COUNT0_RX = (1 << 15) | (1 << 10);		// configure block size = 1 (32 Bytes); number of blocks = 2 (64 bytes)
+		USB_PMA->COUNT0_RX = (1 << USB_COUNT0_RX_BLSIZE_Pos) | (1 << USB_COUNT0_RX_NUM_BLOCK_Pos);		// configure block size = 1 (32 Bytes); number of blocks = 2 (64 bytes)
 	}
 
 /*
