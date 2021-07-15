@@ -30,28 +30,24 @@ __STATIC_INLINE uint16_t SWAPBYTE(uint8_t *addr)
 void USBHandler::USB_ReadPMA(uint16_t wPMABufAddr, uint16_t wNBytes)
 {
 
-	wPMABufAddr = 0x18; // DW ?? Not sure where this comes from
-
 	uint32_t n = (uint32_t)wNBytes >> 1;
 	uint32_t i, temp;
 	volatile uint16_t *pdwVal;
 	uint8_t *pBuf = (uint8_t *)(&xfer_buff);
 
-	pdwVal = (volatile uint16_t *)((uint32_t)(USB) + 0x400U + ((uint32_t)wPMABufAddr));		// 0x40006018
+	pdwVal = (volatile uint16_t *)((uint32_t)(USB_PMAADDR) + ((uint32_t)wPMABufAddr));		// 0x40006018
+	pdwVal = (volatile uint16_t *)(USB_PMAADDR + wPMABufAddr);		// 0x40006018
 
-	for (i = n; i != 0U; i--)
-	{
-		temp = *(__IO uint16_t *)pdwVal;
+	for (i = n; i != 0; i--) {
+		temp = *(volatile uint16_t *)pdwVal;
 		pdwVal++;
 		*pBuf = (uint8_t)((temp >> 0) & 0xFFU);
 		pBuf++;
 		*pBuf = (uint8_t)((temp >> 8) & 0xFFU);
 		pBuf++;
-
 	}
 
-	if ((wNBytes % 2U) != 0U)
-	{
+	if ((wNBytes % 2U) != 0U) {
 		temp = *pdwVal;
 		*pBuf = (uint8_t)((temp >> 0) & 0xFFU);
 	}
@@ -74,7 +70,7 @@ void USBHandler::USB_WritePMA(uint16_t wPMABufAddr, uint16_t wNBytes)
 
 	pdwVal = (volatile uint16_t *)((uint32_t)USB + 0x400U + ((uint32_t)wPMABufAddr));
 
-	for (i = n; i != 0U; i--) {
+	for (i = n; i != 0; i--) {
 		temp1 = *pBuf;
 		pBuf++;
 		temp2 = temp1 | ((uint16_t)((uint16_t) *pBuf << 8));
@@ -85,10 +81,11 @@ void USBHandler::USB_WritePMA(uint16_t wPMABufAddr, uint16_t wNBytes)
 	}
 }
 
-
+/*
 void USBHandler::USBD_ParseSetupRequest()
 {
 	uint8_t *pbuff = (uint8_t *)(&xfer_buff);
+	req.loadData(pbuff);
 
 	req.mRequest = *(uint8_t *)(pbuff);
 
@@ -106,18 +103,21 @@ void USBHandler::USBD_ParseSetupRequest()
 	pbuff++;
 	req.Length = SWAPBYTE(pbuff);
 }
-
+*/
 
 void USBHandler::USBD_LL_SetupStage()
 {
-	USBD_ParseSetupRequest();
+//	USBD_ParseSetupRequest();
+//	uint8_t *pbuff = (uint8_t *)(&xfer_buff);
+	req.loadData(reinterpret_cast<uint8_t*>(&xfer_buff));		// Parse the setup request into the req object
 
+#if (USB_DEBUG)
+	usbDebug[usbDebugNo].Request = req;
+#endif
 	//pdev->ep0_state = USBD_EP0_SETUP;
-
 	//pdev->ep0_data_len = req.Length;
 
-	switch (req.mRequest & 0x1FU)
-	{
+	switch (req.mRequest & 0x1FU) {
 	case USB_REQ_RECIPIENT_DEVICE:
 		USBD_StdDevReq();
 		break;
@@ -159,7 +159,9 @@ void USBHandler::USB_EPStartXfer(Direction direction, uint8_t endpoint, uint32_t
 		//USB_WritePMA(ep->xfer_buff, 0x58, len);
 		USB_WritePMA(0x58, len);
 		//PCD_SET_EP_TX_CNT(USBx, ep->num, len);
+		USB_PMA->COUNT0_TX = len;
 		//PCD_SET_EP_TX_STATUS(USBx, ep->num, USB_EP_TX_VALID);
+		USB->EP0R ^= USB_EP_TX_VALID;
 	} else {		// OUT endpoint
 
 		// Multi packet transfer
@@ -495,19 +497,12 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 		/* stay in loop while pending interrupts */
 		while ((USB->ISTR & USB_ISTR_CTR) != 0)	{
 			wIstr = USB->ISTR;
+			epindex = wIstr & USB_ISTR_EP_ID;		// extract highest priority endpoint number
 
-			/* extract highest priority endpoint number */
-			epindex = wIstr & USB_ISTR_EP_ID;
-
-			if (epindex == 0U)
-			{
+			if (epindex == 0U) {
 				/* Decode and service control endpoint interrupt */
 
-				/* DIR bit = origin of the interrupt */
-				if ((wIstr & USB_ISTR_DIR) == 0U) {
-					/* DIR = 0 */
-
-					/* DIR = 0 => IN  int */
+				if ((wIstr & USB_ISTR_DIR) == 0U) {		// Direction IN
 					/* DIR = 0 implies that (EP_CTR_TX = 1) always */
 					//PCD_CLEAR_TX_EP_CTR(hpcd->Instance, PCD_ENDP0);
 					USB->EP0R &= ~USB_EP_CTR_TX;
@@ -525,27 +520,21 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 						hpcd->USB_Address = 0U;
 					}
 					*/
-				} else {
-					/* DIR = 1 */
-
+				} else {			// Setup or OUT interrupt
 					/* DIR = 1 & CTR_RX => SETUP or OUT int */
 					/* DIR = 1 & (CTR_TX | CTR_RX) => 2 int pending */
 					//ep = &hpcd->OUT_ep[0];
 					//wEPVal = PCD_GET_ENDPOINT(hpcd->Instance, PCD_ENDP0);
 
 					if ((USB->EP0R & USB_EP_SETUP) != 0) {
-						/* Get SETUP Packet */
-						//xfer_count = PCD_EP_RX_CNT(0);
-						xfer_count = USB_PMA->COUNT0_RX;
-
-						USB_ReadPMA(0x18, xfer_count);		// Read data into xfer_buff
+						xfer_count = USB_PMA->COUNT0_RX & USB_COUNT0_RX_COUNT0_RX_Msk;
+						USB_ReadPMA(0x18, xfer_count);		// Read setup data into xfer_buff
 
 						/* SETUP bit kept frozen while CTR_RX = 1 */
 						//PCD_CLEAR_RX_EP_CTR(hpcd->Instance, PCD_ENDP0);
 						USB->EP0R &= ~USB_EP_CTR_RX;
+						USBD_LL_SetupStage();				// Parse setup packet into request, locate data (eg descriptor) and populate TX buffer
 
-						/* Process SETUP Packet*/
-						USBD_LL_SetupStage();
 					} else if ((USB->EP0R & USB_EP_CTR_RX) != 0U) {
 						//PCD_CLEAR_RX_EP_CTR(hpcd->Instance, PCD_ENDP0);
 						USB->EP0R &= ~USB_EP_CTR_RX;
@@ -606,10 +595,10 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 
 		USB->EP0R |= (USB_EP_CONTROL | USB_EP_CTR_RX | USB_EP_CTR_TX);
 		// Open EP0 OUT
-		USB->EP0R = USB_EP_RX_VALID;
+		USB->EP0R = ((USB->EP0R ^ USB_EP_RX_VALID) ^ USB_EP_TX_NAK);		// RX and TX status need to be set with XOR
 
 		// Configure NAK status for the Endpoint
-		USB->EP0R = USB_EP_TX_NAK;
+		//USB->EP0R = USB_EP_TX_NAK;
 
 		// Enable endpoint and set address to 0
 		USB->DADDR = USB_DADDR_EF;
@@ -1048,7 +1037,7 @@ void USBHandler::USBD_CtlError() {
 bool USBHandler::USB_ReadInterrupts(uint32_t interrupt) {
 
 #if (USB_DEBUG)
-	if ((USB->ISTR & interrupt) == interrupt && usbDebugNo < USB_DEBUG_COUNT) {
+	if ((USB->ISTR & interrupt) == interrupt && usbDebugEvent < USB_DEBUG_COUNT) {
 		usbDebugNo = usbDebugEvent % USB_DEBUG_COUNT;
 		usbDebug[usbDebugNo].eventNo = usbDebugEvent;
 		usbDebug[usbDebugNo].Interrupt = USB->ISTR;
