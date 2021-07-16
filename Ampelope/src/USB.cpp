@@ -156,12 +156,11 @@ void USBHandler::USB_EPStartXfer(Direction direction, uint8_t endpoint, uint32_t
 
 		/* configure and validate Tx endpoint */
 
-		//USB_WritePMA(ep->xfer_buff, 0x58, len);
 		USB_WritePMA(0x58, len);
-		//PCD_SET_EP_TX_CNT(USBx, ep->num, len);
 		USB_PMA->COUNT0_TX = len;
-		//PCD_SET_EP_TX_STATUS(USBx, ep->num, USB_EP_TX_VALID);
-		USB->EP0R ^= USB_EP_TX_VALID;
+
+		//USB->EP0R ^= USB_EP_TX_VALID;
+		USB->EP0R = (USB->EP0R & USB_EPREG_MASK) ^ USB_EP_TX_VALID;
 	} else {		// OUT endpoint
 
 		// Multi packet transfer
@@ -181,47 +180,11 @@ void USBHandler::USB_EPStartXfer(Direction direction, uint8_t endpoint, uint32_t
 		}
 
 		//PCD_SET_EP_RX_STATUS(USBx, ep->num, USB_EP_RX_VALID);
-		USB->EP0R ^= USB_EP_RX_VALID;
+		//USB->EP0R ^= USB_EP_RX_VALID;
+		USB->EP0R = (USB->EP0R & USB_EPREG_MASK) ^ USB_EP_RX_VALID;
 	}
 }
 
-/*
-
-
-	if (direction == Direction::in) {				// IN endpoint
-
-		endpoint = endpoint & EP_ADDR_MASK;			// Strip out 0x80 if endpoint passed eg as 0x81
-
-		USBx_INEP(endpoint)->DIEPTSIZ &= ~(USB_OTG_DIEPTSIZ_PKTCNT);
-		USBx_INEP(endpoint)->DIEPTSIZ &= ~(USB_OTG_DIEPTSIZ_XFRSIZ);
-
-		if (endpoint == 0 && xfer_len > ep_maxPacket) {				// If the transfer is larger than the maximum packet size send the maximum size and use the remaining flag to trigger a second send
-			xfer_rem = xfer_len - ep_maxPacket;
-			xfer_len = ep_maxPacket;
-		}
-
-		USBx_INEP(endpoint)->DIEPTSIZ |= (USB_OTG_DIEPTSIZ_PKTCNT & (((xfer_len + ep_maxPacket - 1) / ep_maxPacket) << 19));
-		USBx_INEP(endpoint)->DIEPTSIZ |= (USB_OTG_DIEPTSIZ_XFRSIZ & xfer_len);
-
-		USBx_INEP(endpoint)->DIEPCTL |= (USB_OTG_DIEPCTL_CNAK | USB_OTG_DIEPCTL_EPENA);	// EP enable, IN data in FIFO
-
-		// Enable the Tx FIFO Empty Interrupt for this EP
-		if (xfer_len > 0) {
-			USBx_DEVICE->DIEPEMPMSK |= 1UL << (endpoint & EP_ADDR_MASK);
-		}
-	} else { 		// OUT endpoint
-
-		USBx_OUTEP(endpoint)->DOEPTSIZ &= ~(USB_OTG_DOEPTSIZ_XFRSIZ);
-		USBx_OUTEP(endpoint)->DOEPTSIZ &= ~(USB_OTG_DOEPTSIZ_PKTCNT);
-
-		USBx_OUTEP(endpoint)->DOEPTSIZ |= (USB_OTG_DOEPTSIZ_PKTCNT & (1U << 19));
-		USBx_OUTEP(endpoint)->DOEPTSIZ |= (USB_OTG_DOEPTSIZ_XFRSIZ & xfer_len);
-
-		USBx_OUTEP(endpoint)->DOEPCTL |= (USB_OTG_DOEPCTL_CNAK | USB_OTG_DOEPCTL_EPENA);		// EP enable
-	}
-
-}
-	*/
 
 void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_pcd.c
 
@@ -233,269 +196,6 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 		return;
 
 	USB->ISTR &= ~(USB_ISTR_SOF | USB_ISTR_ESOF);
-
-/*
-	///////////		10			RXFLVL: RxQLevel Interrupt:  Rx FIFO non-empty Indicates that there is at least one packet pending to be read from the Rx FIFO.
-	if (USB_ReadInterrupts(USB_OTG_GINTSTS_RXFLVL))
-	{
-		USB->GINTMSK &= ~USB_OTG_GINTSTS_RXFLVL;
-
-		uint32_t receiveStatus = USB->GRXSTSP;		// OTG status read and pop register: not shown in SFR, but read only (ie do not pop) register under OTG_FS_GLOBAL->FS_GRXSTSR_Device
-		epnum = receiveStatus & USB_OTG_GRXSTSP_EPNUM;		// Get the endpoint number
-		uint16_t packetSize = (receiveStatus & USB_OTG_GRXSTSP_BCNT) >> 4;
-
-#if (USB_DEBUG)
-		usbDebug[usbDebugNo].IntData = receiveStatus;
-		usbDebug[usbDebugNo].endpoint = epnum;
-		usbDebug[usbDebugNo].PacketSize = packetSize;
-#endif
-
-		if (((receiveStatus & USB_OTG_GRXSTSP_PKTSTS) >> 17) == STS_DATA_UPDT && packetSize != 0) {		// 2 = OUT data packet received
-			USB_ReadPacket(xfer_buff, packetSize);
-		} else if (((receiveStatus & USB_OTG_GRXSTSP_PKTSTS) >> 17) == STS_SETUP_UPDT) {				// 6 = SETUP data packet received
-			USB_ReadPacket(xfer_buff, 8U);
-		}
-		if (packetSize != 0) {
-			xfer_count = packetSize;
-#if (USB_DEBUG)
-			usbDebug[usbDebugNo].xferBuff0 = xfer_buff[0];
-			usbDebug[usbDebugNo].xferBuff1 = xfer_buff[1];
-#endif
-		}
-		USB->GINTMSK |= USB_OTG_GINTSTS_RXFLVL;
-	}
-
-
-	/////////// 	80000 		OEPINT OUT endpoint interrupt
-	if (USB_ReadInterrupts(USB_OTG_GINTSTS_OEPINT)) {
-
-		// Read the output endpoint interrupt register to ascertain which endpoint(s) fired an interrupt
-		ep_intr = ((USBx_DEVICE->DAINT & USBx_DEVICE->DAINTMSK) & USB_OTG_DAINTMSK_OEPM_Msk) >> 16;
-
-		// process each endpoint in turn incrementing the epnum and checking the interrupts (ep_intr) if that endpoint fired
-		epnum = 0;
-		while (ep_intr != 0) {
-			if ((ep_intr & 1) != 0) {
-				epint = USBx_OUTEP(epnum)->DOEPINT & USBx_DEVICE->DOEPMSK;
-
-#if (USB_DEBUG)
-				usbDebug[usbDebugNo].endpoint = epnum;
-				usbDebug[usbDebugNo].IntData = epint;
-#endif
-
-				if ((epint & USB_OTG_DOEPINT_XFRC) == USB_OTG_DOEPINT_XFRC) {		// 0x01 Transfer completed
-
-					USBx_OUTEP(epnum)->DOEPINT = USB_OTG_DOEPINT_XFRC;				// Clear interrupt
-
-					if (epnum == 0) {
-
-				        // In CDC mode after 0x21 0x20 packets (line coding commands)
-						if (dev_state == USBD_STATE_CONFIGURED && CmdOpCode != 0) {
-							if (CmdOpCode == 0x20) {			// SET_LINE_CODING - capture the data passed to return when queried with GET_LINE_CODING
-								for (uint8_t i = 0; i < outBuffSize; ++i) {
-									((uint8_t*)&USBD_CDC_LineCoding)[i] = ((uint8_t*)xfer_buff)[i];
-								}
-							}
-							USB_EPStartXfer(Direction::in, 0, 0);
-							CmdOpCode = 0;
-						}
-
-						ep0_state = USBD_EP0_IDLE;
-						USBx_OUTEP(epnum)->DOEPCTL |= USB_OTG_DOEPCTL_STALL;
-					} else {
-						// Call appropriate data handler depending on endpoint of data
-						USB_EPStartXfer(Direction::out, epnum, xfer_count);
-						cdcDataHandler((uint8_t*)xfer_buff, xfer_count);
-					}
-				}
-
-				if ((epint & USB_OTG_DOEPINT_STUP) == USB_OTG_DOEPINT_STUP) {		// SETUP phase done: the application can decode the received SETUP data packet.
-					// Parse Setup Request containing data in xfer_buff filled by RXFLVL interrupt
-					req.loadData((uint8_t*)xfer_buff);
-#if (USB_DEBUG)
-					usbDebug[usbDebugNo].Request = req;
-#endif
-
-					ep0_state = USBD_EP0_SETUP;
-
-					switch (req.mRequest & 0x1F) {		// originally USBD_LL_SetupStage
-					case USB_REQ_RECIPIENT_DEVICE:
-						//initially USB_REQ_GET_DESCRIPTOR >> USB_DESC_TYPE_DEVICE (bmrequest is 0x6)
-						USBD_StdDevReq();
-						break;
-
-					case USB_REQ_RECIPIENT_INTERFACE:
-						if ((req.mRequest & USB_REQ_TYPE_MASK) == USB_REQ_TYPE_CLASS) {		// 0xA1 & 0x60 == 0x20
-
-							if (req.Length > 0) {
-								if ((req.mRequest & USB_REQ_DIRECTION_MASK) != 0U) {		// Device to host [USBD_CtlSendData]
-									// CDC request 0xA1, 0x21, 0x0, 0x0, 0x7		GetLineCoding 0xA1 0x21 0 Interface 7; Data: Line Coding Data Structure
-									// 0xA1 [1|01|00001] Device to host | Class | Interface
-
-									outBuffSize = req.Length;
-									outBuff = (uint8_t*)&USBD_CDC_LineCoding;
-									ep0_state = USBD_EP0_DATA_IN;
-
-#if (USB_DEBUG)
-									usbDebug[usbDebugNo].PacketSize = outBuffSize;
-									usbDebug[usbDebugNo].xferBuff0 = ((uint32_t*)outBuff)[0];
-									usbDebug[usbDebugNo].xferBuff1 = ((uint32_t*)outBuff)[1];
-#endif
-
-									USB_EPStartXfer(Direction::in, 0, req.Length);		// sends blank request back
-								} else {
-									//CDC request 0x21, 0x20, 0x0, 0x0, 0x7			// USBD_CtlPrepareRx
-									// 0x21 [0|01|00001] Host to device | Class | Interface
-									CmdOpCode = req.Request;
-									USB_EPStartXfer(Direction::out, epnum, req.Length);
-								}
-							} else {
-								// 0x21, 0x22, 0x0, 0x0, 0x0	SetControlLineState 0x21 | 0x22 | 2 | Interface | 0 | None
-								// 0x21, 0x20, 0x0, 0x0, 0x0	SetLineCoding       0x21 | 0x20 | 0 | Interface | 0 | Line Coding Data Structure
-								USB_EPStartXfer(Direction::in, 0, 0);
-							}
-
-						}
-						break;
-
-					case USB_REQ_RECIPIENT_ENDPOINT:
-						break;
-
-					default:
-						//USBD_LL_StallEP(pdev, (req.mRequest & 0x80U));
-						break;
-					}
-
-					USBx_OUTEP(epnum)->DOEPINT = USB_OTG_DOEPINT_STUP;				// Clear interrupt
-				}
-
-				if ((epint & USB_OTG_DOEPINT_OTEPDIS) == USB_OTG_DOEPINT_OTEPDIS) {	// OUT token received when endpoint disabled
-					USBx_OUTEP(epnum)->DOEPINT = USB_OTG_DOEPINT_OTEPDIS;			// Clear interrupt
-				}
-				if ((epint & USB_OTG_DOEPINT_OTEPSPR) == USB_OTG_DOEPINT_OTEPSPR) {	// Status Phase Received interrupt
-					USBx_OUTEP(epnum)->DOEPINT = USB_OTG_DOEPINT_OTEPSPR;			// Clear interrupt
-				}
-				if ((epint & USB_OTG_DOEPINT_NAK) == USB_OTG_DOEPINT_NAK) {			// 0x2000 OUT NAK interrupt
-					USBx_OUTEP(epnum)->DOEPINT = USB_OTG_DOEPINT_NAK;				// Clear interrupt
-				}
-			}
-			epnum++;
-			ep_intr >>= 1U;
-		}
-
-	}
-
-	///////////		40000 		IEPINT: IN endpoint interrupt
-	if (USB_ReadInterrupts(USB_OTG_GINTSTS_IEPINT)) {
-
-		// Read in the device interrupt bits [initially 1]
-		ep_intr = (USBx_DEVICE->DAINT & USBx_DEVICE->DAINTMSK) & USB_OTG_DAINTMSK_IEPM_Msk;
-
-		// process each endpoint in turn incrementing the epnum and checking the interrupts (ep_intr) if that endpoint fired
-		epnum = 0;
-		while (ep_intr != 0) {
-			if ((ep_intr & 1) != 0) {
-
-				epint = USBx_INEP(epnum)->DIEPINT & (USBx_DEVICE->DIEPMSK | (((USBx_DEVICE->DIEPEMPMSK >> (epnum & EP_ADDR_MASK)) & 0x1U) << 7));
-
-#if (USB_DEBUG)
-				usbDebug[usbDebugNo].endpoint = epnum;
-				usbDebug[usbDebugNo].IntData = epint;
-#endif
-
-				if ((epint & USB_OTG_DIEPINT_XFRC) == USB_OTG_DIEPINT_XFRC) {			// 0x1 Transfer completed interrupt
-					uint32_t fifoemptymsk = (0x1UL << (epnum & EP_ADDR_MASK));
-					USBx_DEVICE->DIEPEMPMSK &= ~fifoemptymsk;
-
-					USBx_INEP(epnum)->DIEPINT = USB_OTG_DIEPINT_XFRC;
-
-					if (epnum == 0) {
-						if (ep0_state == USBD_EP0_DATA_IN && xfer_rem == 0) {
-							ep0_state = USBD_EP0_STATUS_OUT;							// After completing transmission on EP0 send an out packet [HAL_PCD_EP_Receive]
-							xfer_buff[0] = 0;
-							USB_EPStartXfer(Direction::out, 0, ep_maxPacket);
-
-						} else if (ep0_state == USBD_EP0_DATA_IN && xfer_rem > 0) {		// For EP0 long packets are sent separately rather than streamed out of the FIFO
-							outBuffSize = xfer_rem;
-							xfer_rem = 0;
-#if (USB_DEBUG)
-							usbDebug[usbDebugNo].PacketSize = outBuffSize;
-							usbDebug[usbDebugNo].xferBuff0 = ((uint32_t*)outBuff)[0];
-							usbDebug[usbDebugNo].xferBuff1 = ((uint32_t*)outBuff)[1];
-#endif
-							USB_EPStartXfer(Direction::in, epnum, outBuffSize);
-						}
-					} else {
-						transmitting = false;
-					}
-				}
-
-				if ((epint & USB_OTG_DIEPINT_TXFE) == USB_OTG_DIEPINT_TXFE) {			// 0x80 Transmit FIFO empty
-#if (USB_DEBUG)
-					usbDebug[usbDebugNo].PacketSize = outBuffSize;
-					usbDebug[usbDebugNo].xferBuff0 = ((uint32_t*)outBuff)[0];
-					usbDebug[usbDebugNo].xferBuff1 = ((uint32_t*)outBuff)[1];
-#endif
-					if (epnum == 0) {
-						if (outBuffSize > ep_maxPacket) {
-							xfer_rem = outBuffSize - ep_maxPacket;
-							outBuffSize = ep_maxPacket;
-						}
-
-						USB_WritePacket(outBuff, epnum, static_cast<uint16_t>(outBuffSize));
-
-						outBuff += outBuffSize;		// Move pointer forwards
-						uint32_t fifoemptymsk = (0x1UL << (epnum & EP_ADDR_MASK));
-						USBx_DEVICE->DIEPEMPMSK &= ~fifoemptymsk;
-					} else {
-
-						// For regular endpoints keep writing packets to the FIFO while space available [PCD_WriteEmptyTxFifo]
-						uint16_t len = std::min(outBuffSize - outBuffCount, static_cast<uint32_t>(ep_maxPacket));
-						uint16_t len32b = (len + 3) / 4;			// FIFO size is in 4 byte words
-
-						// INEPTFSAV[15:0]: IN endpoint Tx FIFO space available: 0x0: Endpoint Tx FIFO is full; 0x1: 1 31-bit word available; 0xn: n words available
-						while (((USBx_INEP(epnum)->DTXFSTS & USB_OTG_DTXFSTS_INEPTFSAV) >= len32b) && (outBuffCount < outBuffSize) && (outBuffSize != 0)) {
-
-							len = std::min(outBuffSize - outBuffCount, static_cast<uint32_t>(ep_maxPacket));
-							len32b = (len + 3) / 4;
-#if (USB_DEBUG)
-							usbDebug[usbDebugNo].PacketSize = outBuffSize - outBuffCount;
-							usbDebug[usbDebugNo].xferBuff0 = ((uint32_t*)outBuff)[0];
-							usbDebug[usbDebugNo].xferBuff1 = ((uint32_t*)outBuff)[1];
-#endif
-							USB_WritePacket(outBuff, epnum, len);
-
-							outBuff += len;
-							outBuffCount += len;
-						}
-
-						if (outBuffSize <= outBuffCount) {
-							uint32_t fifoemptymsk = (0x1UL << (epnum & EP_ADDR_MASK));
-							USBx_DEVICE->DIEPEMPMSK &= ~fifoemptymsk;
-						}
-					}
-				}
-
-				if ((epint & USB_OTG_DIEPINT_TOC) == USB_OTG_DIEPINT_TOC) {					// Timeout condition
-					USBx_INEP(epnum)->DIEPINT = USB_OTG_DIEPINT_TOC;
-				}
-				if ((epint & USB_OTG_DIEPINT_ITTXFE) == USB_OTG_DIEPINT_ITTXFE) {			// IN token received when Tx FIFO is empty
-					USBx_INEP(epnum)->DIEPINT = USB_OTG_DIEPINT_ITTXFE;
-				}
-				if ((epint & USB_OTG_DIEPINT_INEPNE) == USB_OTG_DIEPINT_INEPNE) {			// IN endpoint NAK effective
-					USBx_INEP(epnum)->DIEPINT = USB_OTG_DIEPINT_INEPNE;
-				}
-				if ((epint & USB_OTG_DIEPINT_EPDISD) == USB_OTG_DIEPINT_EPDISD) {			// Endpoint disabled interrupt
-					USBx_INEP(epnum)->DIEPINT = USB_OTG_DIEPINT_EPDISD;
-				}
-
-			}
-			epnum++;
-			ep_intr >>= 1U;
-		}
-
-	}
-*/
 
 	/////////// 	8000 		USB_ISTR_CTR: Correct Transfer
 	if (USB_ReadInterrupts(USB_ISTR_CTR)) {
@@ -511,20 +211,17 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 
 				if ((wIstr & USB_ISTR_DIR) == 0U) {		// Direction IN
 					/* DIR = 0 implies that (EP_CTR_TX = 1) always */
-					//PCD_CLEAR_TX_EP_CTR(hpcd->Instance, PCD_ENDP0);
-					USB->EP0R &= ~USB_EP_CTR_TX;
-					//ep = &hpcd->IN_ep[0];
 
-					//xfer_count = PCD_EP_TX_CNT(0);
+					//USB->EP0R &= ~USB_EP_CTR_TX;
+					USB->EP0R = (USB->EP0R & USB_EPREG_MASK) & ~USB_EP_TX_VALID;
 					xfer_count = USB_PMA->COUNT0_TX & USB_COUNT0_TX_COUNT0_TX_Msk;
-					xfer_buff += xfer_count;
+					//xfer_buff += xfer_count;
 
 					// Sets TX status to stall, then eventually calls USB_EPStartXfer
-					USB->EP0R ^= USB_EP_TX_STALL;
-					USB_EPStartXfer(Direction::out, 0, 0);
 
-					// TX COMPLETE
-					//HAL_PCD_DataInStageCallback(hpcd, 0U);
+					//USB->EP0R ^= USB_EP_TX_STALL;
+					USB->EP0R = (USB->EP0R & USB_EPREG_MASK) ^ USB_EP_TX_STALL;
+					USB_EPStartXfer(Direction::out, 0, 0);
 /*
 					if ((hpcd->USB_Address > 0U) && (ep->xfer_len == 0U)) {
 						USB->DADDR = ((uint16_t)hpcd->USB_Address | USB_DADDR_EF);
@@ -544,13 +241,14 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 						/* SETUP bit kept frozen while CTR_RX = 1 */
 						//PCD_CLEAR_RX_EP_CTR(hpcd->Instance, PCD_ENDP0);
 						USB->EP0R &= ~USB_EP_CTR_RX;
+						//USB->EP0R = (USB->EP0R & USB_EPREG_MASK) & ~USB_EP_CTR_RX;
+						USB->EP0R = (USB->EP0R & USB_EPREG_MASK) | USB_EP_DTOG_TX;
 						USBD_LL_SetupStage();				// Parse setup packet into request, locate data (eg descriptor) and populate TX buffer
 
 					} else if ((USB->EP0R & USB_EP_CTR_RX) != 0U) {
 						//PCD_CLEAR_RX_EP_CTR(hpcd->Instance, PCD_ENDP0);
 						USB->EP0R &= ~USB_EP_CTR_RX;
 
-						// DW USB Sram buffers at 0x40006000 - 0x400063FF		See p2037 for offsets
 						xfer_count = USB_PMA->COUNT0_RX;
 						/* Get Control Data OUT Packet */
 						//ep->xfer_count = PCD_EP_RX_CNT(hpcd->Instance, ep->num);
@@ -605,21 +303,285 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 		USB->ISTR &= ~USB_ISTR_RESET;
 
 		USB->EP0R |= (USB_EP_CONTROL | USB_EP_CTR_RX | USB_EP_CTR_TX);
-		// Open EP0 OUT
 		USB->EP0R = ((USB->EP0R ^ USB_EP_RX_VALID) ^ USB_EP_TX_NAK);		// RX and TX status need to be set with XOR
-
-		// Configure NAK status for the Endpoint
-		//USB->EP0R = USB_EP_TX_NAK;
-
-		// Enable endpoint and set address to 0
-		USB->DADDR = USB_DADDR_EF;
+		USB->DADDR = USB_DADDR_EF;								// Enable endpoint and set address to 0
 
 		// Configure the PMA for EP 0
 		USB_PMA->ADDR0_TX = 0x58;						// Offset of PMA used for EP0 TX
 		//USB_PMA->COUNT0_TX = 0x1C;
 		USB_PMA->ADDR0_RX = 0x18;						// Offset of PMA used for EP0 RX
 		USB_PMA->COUNT0_RX = (1 << USB_COUNT0_RX_BLSIZE_Pos) | (1 << USB_COUNT0_RX_NUM_BLOCK_Pos);		// configure block size = 1 (32 Bytes); number of blocks = 2 (64 bytes)
+		if (USB->EP0R & USB_EP_DTOG_TX) {
+			USB->EP0R = (USB->EP0R & USB_EPREG_MASK) | USB_EP_DTOG_TX;			// FIXME not sure where this needs to be set PCD_TX_DTOG
+		}
+		if (USB->EP0R & USB_EP_DTOG_RX) {
+			USB->EP0R = (USB->EP0R & USB_EPREG_MASK) | USB_EP_DTOG_RX;			// FIXME not sure where this needs to be set PCD_TX_DTOG
+		}
 	}
+
+	/*
+		///////////		10			RXFLVL: RxQLevel Interrupt:  Rx FIFO non-empty Indicates that there is at least one packet pending to be read from the Rx FIFO.
+		if (USB_ReadInterrupts(USB_OTG_GINTSTS_RXFLVL))
+		{
+			USB->GINTMSK &= ~USB_OTG_GINTSTS_RXFLVL;
+
+			uint32_t receiveStatus = USB->GRXSTSP;		// OTG status read and pop register: not shown in SFR, but read only (ie do not pop) register under OTG_FS_GLOBAL->FS_GRXSTSR_Device
+			epnum = receiveStatus & USB_OTG_GRXSTSP_EPNUM;		// Get the endpoint number
+			uint16_t packetSize = (receiveStatus & USB_OTG_GRXSTSP_BCNT) >> 4;
+
+	#if (USB_DEBUG)
+			usbDebug[usbDebugNo].IntData = receiveStatus;
+			usbDebug[usbDebugNo].endpoint = epnum;
+			usbDebug[usbDebugNo].PacketSize = packetSize;
+	#endif
+
+			if (((receiveStatus & USB_OTG_GRXSTSP_PKTSTS) >> 17) == STS_DATA_UPDT && packetSize != 0) {		// 2 = OUT data packet received
+				USB_ReadPacket(xfer_buff, packetSize);
+			} else if (((receiveStatus & USB_OTG_GRXSTSP_PKTSTS) >> 17) == STS_SETUP_UPDT) {				// 6 = SETUP data packet received
+				USB_ReadPacket(xfer_buff, 8U);
+			}
+			if (packetSize != 0) {
+				xfer_count = packetSize;
+	#if (USB_DEBUG)
+				usbDebug[usbDebugNo].xferBuff0 = xfer_buff[0];
+				usbDebug[usbDebugNo].xferBuff1 = xfer_buff[1];
+	#endif
+			}
+			USB->GINTMSK |= USB_OTG_GINTSTS_RXFLVL;
+		}
+
+
+		/////////// 	80000 		OEPINT OUT endpoint interrupt
+		if (USB_ReadInterrupts(USB_OTG_GINTSTS_OEPINT)) {
+
+			// Read the output endpoint interrupt register to ascertain which endpoint(s) fired an interrupt
+			ep_intr = ((USBx_DEVICE->DAINT & USBx_DEVICE->DAINTMSK) & USB_OTG_DAINTMSK_OEPM_Msk) >> 16;
+
+			// process each endpoint in turn incrementing the epnum and checking the interrupts (ep_intr) if that endpoint fired
+			epnum = 0;
+			while (ep_intr != 0) {
+				if ((ep_intr & 1) != 0) {
+					epint = USBx_OUTEP(epnum)->DOEPINT & USBx_DEVICE->DOEPMSK;
+
+	#if (USB_DEBUG)
+					usbDebug[usbDebugNo].endpoint = epnum;
+					usbDebug[usbDebugNo].IntData = epint;
+	#endif
+
+					if ((epint & USB_OTG_DOEPINT_XFRC) == USB_OTG_DOEPINT_XFRC) {		// 0x01 Transfer completed
+
+						USBx_OUTEP(epnum)->DOEPINT = USB_OTG_DOEPINT_XFRC;				// Clear interrupt
+
+						if (epnum == 0) {
+
+					        // In CDC mode after 0x21 0x20 packets (line coding commands)
+							if (dev_state == USBD_STATE_CONFIGURED && CmdOpCode != 0) {
+								if (CmdOpCode == 0x20) {			// SET_LINE_CODING - capture the data passed to return when queried with GET_LINE_CODING
+									for (uint8_t i = 0; i < outBuffSize; ++i) {
+										((uint8_t*)&USBD_CDC_LineCoding)[i] = ((uint8_t*)xfer_buff)[i];
+									}
+								}
+								USB_EPStartXfer(Direction::in, 0, 0);
+								CmdOpCode = 0;
+							}
+
+							ep0_state = USBD_EP0_IDLE;
+							USBx_OUTEP(epnum)->DOEPCTL |= USB_OTG_DOEPCTL_STALL;
+						} else {
+							// Call appropriate data handler depending on endpoint of data
+							USB_EPStartXfer(Direction::out, epnum, xfer_count);
+							cdcDataHandler((uint8_t*)xfer_buff, xfer_count);
+						}
+					}
+
+					if ((epint & USB_OTG_DOEPINT_STUP) == USB_OTG_DOEPINT_STUP) {		// SETUP phase done: the application can decode the received SETUP data packet.
+						// Parse Setup Request containing data in xfer_buff filled by RXFLVL interrupt
+						req.loadData((uint8_t*)xfer_buff);
+	#if (USB_DEBUG)
+						usbDebug[usbDebugNo].Request = req;
+	#endif
+
+						ep0_state = USBD_EP0_SETUP;
+
+						switch (req.mRequest & 0x1F) {		// originally USBD_LL_SetupStage
+						case USB_REQ_RECIPIENT_DEVICE:
+							//initially USB_REQ_GET_DESCRIPTOR >> USB_DESC_TYPE_DEVICE (bmrequest is 0x6)
+							USBD_StdDevReq();
+							break;
+
+						case USB_REQ_RECIPIENT_INTERFACE:
+							if ((req.mRequest & USB_REQ_TYPE_MASK) == USB_REQ_TYPE_CLASS) {		// 0xA1 & 0x60 == 0x20
+
+								if (req.Length > 0) {
+									if ((req.mRequest & USB_REQ_DIRECTION_MASK) != 0U) {		// Device to host [USBD_CtlSendData]
+										// CDC request 0xA1, 0x21, 0x0, 0x0, 0x7		GetLineCoding 0xA1 0x21 0 Interface 7; Data: Line Coding Data Structure
+										// 0xA1 [1|01|00001] Device to host | Class | Interface
+
+										outBuffSize = req.Length;
+										outBuff = (uint8_t*)&USBD_CDC_LineCoding;
+										ep0_state = USBD_EP0_DATA_IN;
+
+	#if (USB_DEBUG)
+										usbDebug[usbDebugNo].PacketSize = outBuffSize;
+										usbDebug[usbDebugNo].xferBuff0 = ((uint32_t*)outBuff)[0];
+										usbDebug[usbDebugNo].xferBuff1 = ((uint32_t*)outBuff)[1];
+	#endif
+
+										USB_EPStartXfer(Direction::in, 0, req.Length);		// sends blank request back
+									} else {
+										//CDC request 0x21, 0x20, 0x0, 0x0, 0x7			// USBD_CtlPrepareRx
+										// 0x21 [0|01|00001] Host to device | Class | Interface
+										CmdOpCode = req.Request;
+										USB_EPStartXfer(Direction::out, epnum, req.Length);
+									}
+								} else {
+									// 0x21, 0x22, 0x0, 0x0, 0x0	SetControlLineState 0x21 | 0x22 | 2 | Interface | 0 | None
+									// 0x21, 0x20, 0x0, 0x0, 0x0	SetLineCoding       0x21 | 0x20 | 0 | Interface | 0 | Line Coding Data Structure
+									USB_EPStartXfer(Direction::in, 0, 0);
+								}
+
+							}
+							break;
+
+						case USB_REQ_RECIPIENT_ENDPOINT:
+							break;
+
+						default:
+							//USBD_LL_StallEP(pdev, (req.mRequest & 0x80U));
+							break;
+						}
+
+						USBx_OUTEP(epnum)->DOEPINT = USB_OTG_DOEPINT_STUP;				// Clear interrupt
+					}
+
+					if ((epint & USB_OTG_DOEPINT_OTEPDIS) == USB_OTG_DOEPINT_OTEPDIS) {	// OUT token received when endpoint disabled
+						USBx_OUTEP(epnum)->DOEPINT = USB_OTG_DOEPINT_OTEPDIS;			// Clear interrupt
+					}
+					if ((epint & USB_OTG_DOEPINT_OTEPSPR) == USB_OTG_DOEPINT_OTEPSPR) {	// Status Phase Received interrupt
+						USBx_OUTEP(epnum)->DOEPINT = USB_OTG_DOEPINT_OTEPSPR;			// Clear interrupt
+					}
+					if ((epint & USB_OTG_DOEPINT_NAK) == USB_OTG_DOEPINT_NAK) {			// 0x2000 OUT NAK interrupt
+						USBx_OUTEP(epnum)->DOEPINT = USB_OTG_DOEPINT_NAK;				// Clear interrupt
+					}
+				}
+				epnum++;
+				ep_intr >>= 1U;
+			}
+
+		}
+
+		///////////		40000 		IEPINT: IN endpoint interrupt
+		if (USB_ReadInterrupts(USB_OTG_GINTSTS_IEPINT)) {
+
+			// Read in the device interrupt bits [initially 1]
+			ep_intr = (USBx_DEVICE->DAINT & USBx_DEVICE->DAINTMSK) & USB_OTG_DAINTMSK_IEPM_Msk;
+
+			// process each endpoint in turn incrementing the epnum and checking the interrupts (ep_intr) if that endpoint fired
+			epnum = 0;
+			while (ep_intr != 0) {
+				if ((ep_intr & 1) != 0) {
+
+					epint = USBx_INEP(epnum)->DIEPINT & (USBx_DEVICE->DIEPMSK | (((USBx_DEVICE->DIEPEMPMSK >> (epnum & EP_ADDR_MASK)) & 0x1U) << 7));
+
+	#if (USB_DEBUG)
+					usbDebug[usbDebugNo].endpoint = epnum;
+					usbDebug[usbDebugNo].IntData = epint;
+	#endif
+
+					if ((epint & USB_OTG_DIEPINT_XFRC) == USB_OTG_DIEPINT_XFRC) {			// 0x1 Transfer completed interrupt
+						uint32_t fifoemptymsk = (0x1UL << (epnum & EP_ADDR_MASK));
+						USBx_DEVICE->DIEPEMPMSK &= ~fifoemptymsk;
+
+						USBx_INEP(epnum)->DIEPINT = USB_OTG_DIEPINT_XFRC;
+
+						if (epnum == 0) {
+							if (ep0_state == USBD_EP0_DATA_IN && xfer_rem == 0) {
+								ep0_state = USBD_EP0_STATUS_OUT;							// After completing transmission on EP0 send an out packet [HAL_PCD_EP_Receive]
+								xfer_buff[0] = 0;
+								USB_EPStartXfer(Direction::out, 0, ep_maxPacket);
+
+							} else if (ep0_state == USBD_EP0_DATA_IN && xfer_rem > 0) {		// For EP0 long packets are sent separately rather than streamed out of the FIFO
+								outBuffSize = xfer_rem;
+								xfer_rem = 0;
+	#if (USB_DEBUG)
+								usbDebug[usbDebugNo].PacketSize = outBuffSize;
+								usbDebug[usbDebugNo].xferBuff0 = ((uint32_t*)outBuff)[0];
+								usbDebug[usbDebugNo].xferBuff1 = ((uint32_t*)outBuff)[1];
+	#endif
+								USB_EPStartXfer(Direction::in, epnum, outBuffSize);
+							}
+						} else {
+							transmitting = false;
+						}
+					}
+
+					if ((epint & USB_OTG_DIEPINT_TXFE) == USB_OTG_DIEPINT_TXFE) {			// 0x80 Transmit FIFO empty
+	#if (USB_DEBUG)
+						usbDebug[usbDebugNo].PacketSize = outBuffSize;
+						usbDebug[usbDebugNo].xferBuff0 = ((uint32_t*)outBuff)[0];
+						usbDebug[usbDebugNo].xferBuff1 = ((uint32_t*)outBuff)[1];
+	#endif
+						if (epnum == 0) {
+							if (outBuffSize > ep_maxPacket) {
+								xfer_rem = outBuffSize - ep_maxPacket;
+								outBuffSize = ep_maxPacket;
+							}
+
+							USB_WritePacket(outBuff, epnum, static_cast<uint16_t>(outBuffSize));
+
+							outBuff += outBuffSize;		// Move pointer forwards
+							uint32_t fifoemptymsk = (0x1UL << (epnum & EP_ADDR_MASK));
+							USBx_DEVICE->DIEPEMPMSK &= ~fifoemptymsk;
+						} else {
+
+							// For regular endpoints keep writing packets to the FIFO while space available [PCD_WriteEmptyTxFifo]
+							uint16_t len = std::min(outBuffSize - outBuffCount, static_cast<uint32_t>(ep_maxPacket));
+							uint16_t len32b = (len + 3) / 4;			// FIFO size is in 4 byte words
+
+							// INEPTFSAV[15:0]: IN endpoint Tx FIFO space available: 0x0: Endpoint Tx FIFO is full; 0x1: 1 31-bit word available; 0xn: n words available
+							while (((USBx_INEP(epnum)->DTXFSTS & USB_OTG_DTXFSTS_INEPTFSAV) >= len32b) && (outBuffCount < outBuffSize) && (outBuffSize != 0)) {
+
+								len = std::min(outBuffSize - outBuffCount, static_cast<uint32_t>(ep_maxPacket));
+								len32b = (len + 3) / 4;
+	#if (USB_DEBUG)
+								usbDebug[usbDebugNo].PacketSize = outBuffSize - outBuffCount;
+								usbDebug[usbDebugNo].xferBuff0 = ((uint32_t*)outBuff)[0];
+								usbDebug[usbDebugNo].xferBuff1 = ((uint32_t*)outBuff)[1];
+	#endif
+								USB_WritePacket(outBuff, epnum, len);
+
+								outBuff += len;
+								outBuffCount += len;
+							}
+
+							if (outBuffSize <= outBuffCount) {
+								uint32_t fifoemptymsk = (0x1UL << (epnum & EP_ADDR_MASK));
+								USBx_DEVICE->DIEPEMPMSK &= ~fifoemptymsk;
+							}
+						}
+					}
+
+					if ((epint & USB_OTG_DIEPINT_TOC) == USB_OTG_DIEPINT_TOC) {					// Timeout condition
+						USBx_INEP(epnum)->DIEPINT = USB_OTG_DIEPINT_TOC;
+					}
+					if ((epint & USB_OTG_DIEPINT_ITTXFE) == USB_OTG_DIEPINT_ITTXFE) {			// IN token received when Tx FIFO is empty
+						USBx_INEP(epnum)->DIEPINT = USB_OTG_DIEPINT_ITTXFE;
+					}
+					if ((epint & USB_OTG_DIEPINT_INEPNE) == USB_OTG_DIEPINT_INEPNE) {			// IN endpoint NAK effective
+						USBx_INEP(epnum)->DIEPINT = USB_OTG_DIEPINT_INEPNE;
+					}
+					if ((epint & USB_OTG_DIEPINT_EPDISD) == USB_OTG_DIEPINT_EPDISD) {			// Endpoint disabled interrupt
+						USBx_INEP(epnum)->DIEPINT = USB_OTG_DIEPINT_EPDISD;
+					}
+
+				}
+				epnum++;
+				ep_intr >>= 1U;
+			}
+
+		}
+
+
 
 /*
 	/////////// 	2000		ENUMDNE: Enumeration done Interrupt
@@ -704,84 +666,6 @@ void USBHandler::InitUSB()
 	/* Enabling DP Pull-UP bit to Connect internal PU resistor on USB DP line */
 	USB->BCDR |= (uint16_t)USB_BCDR_DPPU;
 
-/*
-	// USB GPIO Configuration: PA8: USB_SOF; PA9: USB_VBUS; PA10: USB_ID; PA11: USB_DM; PA12: USB_DP
-	RCC->AHB4ENR |= RCC_AHB4ENR_GPIOAEN;				// GPIO port clock
-
-	// PA8 (SOF), PA10 (ID), PA11 (DM), PA12 (DP) (NB PA9 - VBUS uses default values)
-	GPIOA->MODER &= ~GPIO_MODER_MODE9;
-	GPIOA->MODER &= ~GPIO_MODER_MODE11_0;
-	GPIOA->MODER &= ~GPIO_MODER_MODE12_0;
-	//GPIOA->OSPEEDR |= GPIO_OSPEEDR_OSPEED11 | GPIO_OSPEEDR_OSPEED12;		// 11: High speed FIXME - set to low in HAL
-	GPIOA->AFR[1] |= (10 << GPIO_AFRH_AFSEL11_Pos) | (10 << GPIO_AFRH_AFSEL12_Pos);		// Alternate Function 10 is OTG_FS
-
-
-	NVIC_SetPriority(OTG_FS_IRQn, 3);
-	NVIC_EnableIRQ(OTG_FS_IRQn);
-
-	USB->GAHBCFG &= ~USB_OTG_GAHBCFG_GINT;		// Disable the controller's Global Int in the AHB Config reg
-	USB->GUSBCFG |= USB_OTG_GUSBCFG_PHYSEL;		// Select FS Embedded PHY
-
-	// Reset the core (needed after clock change) - NB removed delays
-	while ((USB->GRSTCTL & USB_OTG_GRSTCTL_AHBIDL) == 0);
-	USB->GRSTCTL |= USB_OTG_GRSTCTL_CSRST;
-	while ((USB->GRSTCTL & USB_OTG_GRSTCTL_CSRST) == USB_OTG_GRSTCTL_CSRST);
-
-	USB->GCCFG |= USB_OTG_GCCFG_PWRDWN;			// Activate the transceiver in transmission/reception. When reset, the transceiver is kept in power-down. 0 = USB FS transceiver disabled; 1 = USB FS transceiver enabled
-	USB->GUSBCFG |= USB_OTG_GUSBCFG_FDMOD;		// Force USB device mode
-	//HAL_Delay(50U);
-
-	// Clear all transmit FIFO address and data lengths - these will be set to correct values below for endpoints 0,1 and 2
-	for (uint8_t i = 0U; i < 15U; i++) {
-		USB->DIEPTXF[i] = 0U;
-	}
-
-	USB->GCCFG |= USB_OTG_GCCFG_VBDEN; 			// Enable HW VBUS sensing
-
-	// FIXME - delay here???
-	USBx_DEVICE->DCFG |= USB_OTG_DCFG_DSPD;				// 11: Full speed using internal FS PHY
-
-	USB->GRSTCTL |= USB_OTG_GRSTCTL_TXFNUM_4;	// Select buffers to flush. 10000: Flush all the transmit FIFOs in device or host mode
-	USB->GRSTCTL |= USB_OTG_GRSTCTL_TXFFLSH;		// Flush the TX buffers
-	while ((USB->GRSTCTL & USB_OTG_GRSTCTL_TXFFLSH) == USB_OTG_GRSTCTL_TXFFLSH);
-
-	USB->GRSTCTL = USB_OTG_GRSTCTL_RXFFLSH;		// Flush the RX buffers
-	while ((USB->GRSTCTL & USB_OTG_GRSTCTL_RXFFLSH) == USB_OTG_GRSTCTL_RXFFLSH);
-
-	USB->ISTR = 0xBFFFFFFFU;					// Clear pending interrupts (except SRQINT Session request/new session detected)
-
-	// Enable interrupts
-	USB->GINTMSK = 0U;							// Disable all interrupts
-	USB->GINTMSK |= USB_OTG_GINTMSK_RXFLVLM | USB_OTG_GINTMSK_USBSUSPM |			// Receive FIFO non-empty mask; USB suspend
-			USB_OTG_GINTMSK_USBRST | USB_OTG_GINTMSK_ENUMDNEM |							// USB reset; Enumeration done
-			USB_OTG_GINTMSK_IEPINT | USB_OTG_GINTMSK_OEPINT | USB_OTG_GINTMSK_WUIM |	// IN endpoint; OUT endpoint; Resume/remote wakeup detected
-			USB_OTG_GINTMSK_SRQIM | USB_OTG_GINTMSK_OTGINT;								// Session request/new session detected; OTG interrupt [both used for VBUS sensing]
-
-
-	// NB - FIFO Sizes are in words NOT bytes. There is a total size of 320 (320x4 = 1280 bytes) available which is divided up thus:
-	// FIFO		Start		Size
-	// RX 		0			128
-	// EP0 TX	128			64
-	// EP1 TX	192			64
-	// EP2 TX 	256			64
-
-	USB->GRXFSIZ = 128;		 					// Rx FIFO depth
-
-	// Endpoint 0 Transmit FIFO size/address (as in device mode - this is also used as the non-periodic transmit FIFO size in host mode)
-	USB->DIEPTXF0_HNPTXFSIZ = (64 << USB_OTG_TX0FD_Pos) |		// IN Endpoint 0 Tx FIFO depth
-			(128 << USB_OTG_TX0FSA_Pos);								// IN Endpoint 0 FIFO transmit RAM start address - this is offset from the RX FIFO (set above to 128)
-
-	// Endpoint 1 FIFO size/address (address is offset from EP0 address+size above)
-	USB->DIEPTXF[0] = (64 << USB_OTG_DIEPTXF_INEPTXFD_Pos) |		// IN endpoint 1 Tx FIFO depth
-			(192 << USB_OTG_DIEPTXF_INEPTXSA_Pos);  					// IN endpoint 1 FIFO transmit RAM start address
-
-	// Endpoint 2 FIFO size/address (address is offset from EP1 address+size above)
-	USB->DIEPTXF[1] = (64 << USB_OTG_DIEPTXF_INEPTXFD_Pos) |		// IN endpoint 2 Tx FIFO depth
-			(256 << USB_OTG_DIEPTXF_INEPTXSA_Pos);  					// IN endpoint 2 FIFO transmit RAM start address
-
-    USBx_DEVICE->DCTL &= ~USB_OTG_DCTL_SDIS;			// Activate USB
-    USB->GAHBCFG |= USB_OTG_GAHBCFG_GINT;		// Activate USB Interrupts
-*/
 }
 
 
