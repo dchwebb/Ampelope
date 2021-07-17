@@ -12,6 +12,120 @@ extern bool USBDebug;
 #define USB_DEBUG_COUNT 400
 #endif
 
+#define PCD_GET_ENDPOINT(USBx, bEpNum)             (*(__IO uint16_t *)(&(USBx)->EP0R + ((bEpNum) * 2U)))
+#define PCD_SET_ENDPOINT(USBx, bEpNum, wRegValue)  (*(__IO uint16_t *)(&(USBx)->EP0R + ((bEpNum) * 2U)) = (uint16_t)(wRegValue))
+
+
+#define PCD_CLEAR_RX_EP_CTR(USBx, bEpNum) \
+		do { \
+			uint16_t _wRegVal; \
+			\
+			_wRegVal = PCD_GET_ENDPOINT((USBx), (bEpNum)) & (0x7FFFU & USB_EPREG_MASK); \
+			\
+			PCD_SET_ENDPOINT((USBx), (bEpNum), (_wRegVal | USB_EP_CTR_TX)); \
+		} while(0) /* PCD_CLEAR_RX_EP_CTR */
+
+#define PCD_CLEAR_TX_EP_CTR(USBx, bEpNum) \
+		do { \
+			uint16_t _wRegVal; \
+			\
+			_wRegVal = PCD_GET_ENDPOINT((USBx), (bEpNum)) & (0xFF7FU & USB_EPREG_MASK); \
+			\
+			PCD_SET_ENDPOINT((USBx), (bEpNum), (_wRegVal | USB_EP_CTR_RX)); \
+		} while(0) /* PCD_CLEAR_TX_EP_CTR */
+
+
+#define PCD_RX_DTOG(USBx, bEpNum) \
+		do { \
+			uint16_t _wEPVal; \
+			\
+			_wEPVal = PCD_GET_ENDPOINT((USBx), (bEpNum)) & USB_EPREG_MASK; \
+			\
+			PCD_SET_ENDPOINT((USBx), (bEpNum), (_wEPVal | USB_EP_CTR_RX | USB_EP_CTR_TX | USB_EP_DTOG_RX)); \
+		} while(0) /* PCD_RX_DTOG */
+
+#define PCD_TX_DTOG(USBx, bEpNum) \
+		do { \
+			uint16_t _wEPVal; \
+			\
+			_wEPVal = PCD_GET_ENDPOINT((USBx), (bEpNum)) & USB_EPREG_MASK; \
+			\
+			PCD_SET_ENDPOINT((USBx), (bEpNum), (_wEPVal | USB_EP_CTR_RX | USB_EP_CTR_TX | USB_EP_DTOG_TX)); \
+		} while(0) /* PCD_TX_DTOG */
+/**
+ * @brief  Clears DTOG_RX / DTOG_TX bit in the endpoint register.
+ * @param  USBx USB peripheral instance register address.
+ * @param  bEpNum Endpoint Number.
+ * @retval None
+ */
+#define PCD_CLEAR_RX_DTOG(USBx, bEpNum) \
+		do { \
+			uint16_t _wRegVal; \
+			\
+			_wRegVal = PCD_GET_ENDPOINT((USBx), (bEpNum)); \
+			\
+			if ((_wRegVal & USB_EP_DTOG_RX) != 0U)\
+			{ \
+				PCD_RX_DTOG((USBx), (bEpNum)); \
+			} \
+		} while(0) /* PCD_CLEAR_RX_DTOG */
+
+#define PCD_CLEAR_TX_DTOG(USBx, bEpNum) \
+		do { \
+			uint16_t _wRegVal; \
+			\
+			_wRegVal = PCD_GET_ENDPOINT((USBx), (bEpNum)); \
+			\
+			if ((_wRegVal & USB_EP_DTOG_TX) != 0U)\
+			{ \
+				PCD_TX_DTOG((USBx), (bEpNum)); \
+			} \
+		} while(0) /* PCD_CLEAR_TX_DTOG */
+
+
+#define PCD_SET_EP_TX_STATUS(USBx, bEpNum, wState) \
+		do { \
+			uint16_t _wRegVal; \
+			\
+			_wRegVal = PCD_GET_ENDPOINT((USBx), (bEpNum)) & USB_EPTX_DTOGMASK; \
+			/* toggle first bit ? */ \
+		if ((USB_EPTX_DTOG1 & (wState))!= 0U) \
+		{ \
+			_wRegVal ^= USB_EPTX_DTOG1; \
+		} \
+		/* toggle second bit ?  */ \
+		if ((USB_EPTX_DTOG2 & (wState))!= 0U) \
+		{ \
+			_wRegVal ^= USB_EPTX_DTOG2; \
+		} \
+		PCD_SET_ENDPOINT((USBx), (bEpNum), (_wRegVal | USB_EP_CTR_RX | USB_EP_CTR_TX)); \
+	} while(0) /* PCD_SET_EP_TX_STATUS */
+
+		/**
+		 * @brief  sets the status for rx transfer (bits STAT_TX[1:0])
+		 * @param  USBx USB peripheral instance register address.
+		 * @param  bEpNum Endpoint Number.
+		 * @param  wState new state
+		 * @retval None
+		 */
+#define PCD_SET_EP_RX_STATUS(USBx, bEpNum,wState) \
+		do { \
+			uint16_t _wRegVal; \
+			\
+			_wRegVal = PCD_GET_ENDPOINT((USBx), (bEpNum)) & USB_EPRX_DTOGMASK; \
+			/* toggle first bit ? */ \
+		if ((USB_EPRX_DTOG1 & (wState))!= 0U) \
+		{ \
+			_wRegVal ^= USB_EPRX_DTOG1; \
+		} \
+		/* toggle second bit ? */ \
+		if ((USB_EPRX_DTOG2 & (wState))!= 0U) \
+		{ \
+			_wRegVal ^= USB_EPRX_DTOG2; \
+		} \
+		PCD_SET_ENDPOINT((USBx), (bEpNum), (_wRegVal | USB_EP_CTR_RX | USB_EP_CTR_TX)); \
+	} while(0) /* PCD_SET_EP_RX_STATUS */
+
 
 // USB Hardware Registers
 #define USBx_PCGCCTL	*reinterpret_cast<__IO uint32_t*>(USB2_OTG_FS_PERIPH_BASE + USB_OTG_PCGCCTL_BASE)

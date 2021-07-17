@@ -160,7 +160,8 @@ void USBHandler::USB_EPStartXfer(Direction direction, uint8_t endpoint, uint32_t
 		USB_PMA->COUNT0_TX = len;
 
 		//USB->EP0R ^= USB_EP_TX_VALID;
-		USB->EP0R = (USB->EP0R & USB_EPREG_MASK) ^ USB_EP_TX_VALID;
+		//USB->EP0R = (USB->EP0R & USB_EPREG_MASK) ^ USB_EP_TX_VALID;
+		PCD_SET_EP_TX_STATUS(USB, 0, USB_EP_TX_VALID);
 	} else {		// OUT endpoint
 
 		// Multi packet transfer
@@ -181,7 +182,8 @@ void USBHandler::USB_EPStartXfer(Direction direction, uint8_t endpoint, uint32_t
 
 		//PCD_SET_EP_RX_STATUS(USBx, ep->num, USB_EP_RX_VALID);
 		//USB->EP0R ^= USB_EP_RX_VALID;
-		USB->EP0R = (USB->EP0R & USB_EPREG_MASK) ^ USB_EP_RX_VALID;
+		//USB->EP0R = (USB->EP0R & USB_EPREG_MASK) ^ USB_EP_RX_VALID;
+		PCD_SET_EP_RX_STATUS(USB, 0, USB_EP_RX_VALID);
 	}
 }
 
@@ -200,9 +202,15 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 	/////////// 	8000 		USB_ISTR_CTR: Correct Transfer
 	if (USB_ReadInterrupts(USB_ISTR_CTR)) {
 		uint8_t epindex;
-
-		/* stay in loop while pending interrupts */
+		uint8_t test = 0;
+		// stay in loop while pending interrupts Originally PCD_EP_ISR_Handler in
 		while ((USB->ISTR & USB_ISTR_CTR) != 0)	{
+			if (test > 0) {
+				int stop = 1;
+
+			} else {
+				test++;
+			}
 			wIstr = USB->ISTR;
 			epindex = wIstr & USB_ISTR_EP_ID;		// extract highest priority endpoint number
 
@@ -213,14 +221,16 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 					/* DIR = 0 implies that (EP_CTR_TX = 1) always */
 
 					//USB->EP0R &= ~USB_EP_CTR_TX;
-					USB->EP0R = (USB->EP0R & USB_EPREG_MASK) & ~USB_EP_TX_VALID;
+					//USB->EP0R = (USB->EP0R & USB_EPREG_MASK) & ~USB_EP_TX_VALID;
+					PCD_SET_EP_TX_STATUS(USB, 0, USB_EP_TX_VALID);
 					xfer_count = USB_PMA->COUNT0_TX & USB_COUNT0_TX_COUNT0_TX_Msk;
 					//xfer_buff += xfer_count;
 
 					// Sets TX status to stall, then eventually calls USB_EPStartXfer
 
 					//USB->EP0R ^= USB_EP_TX_STALL;
-					USB->EP0R = (USB->EP0R & USB_EPREG_MASK) ^ USB_EP_TX_STALL;
+					//USB->EP0R = (USB->EP0R & USB_EPREG_MASK) ^ USB_EP_TX_STALL;
+					PCD_SET_EP_TX_STATUS(USB, 0, USB_EP_TX_STALL);
 					USB_EPStartXfer(Direction::out, 0, 0);
 /*
 					if ((hpcd->USB_Address > 0U) && (ep->xfer_len == 0U)) {
@@ -239,15 +249,23 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 						USB_ReadPMA(0x18, xfer_count);		// Read setup data into xfer_buff
 
 						/* SETUP bit kept frozen while CTR_RX = 1 */
-						//PCD_CLEAR_RX_EP_CTR(hpcd->Instance, PCD_ENDP0);
-						USB->EP0R &= ~USB_EP_CTR_RX;
-						//USB->EP0R = (USB->EP0R & USB_EPREG_MASK) & ~USB_EP_CTR_RX;
-						USB->EP0R = (USB->EP0R & USB_EPREG_MASK) | USB_EP_DTOG_TX;
+
+						uint16_t ep0reg = USB->EP0R;
+
+						PCD_CLEAR_RX_EP_CTR(USB, 0);
+						//USB->EP0R &= ~USB_EP_CTR_RX;
+
+						// Botch to try and avoid the data0/data1 bit toggling incorrectly when setting other values in EP0R
+//						if (ep0reg & USB_EP_DTOG_TX) {
+//							USB->EP0R = (USB->EP0R & USB_EPREG_MASK) | USB_EP_DTOG_TX;
+//						}
+//						uint16_t tmpb = USB->EP0R;
 						USBD_LL_SetupStage();				// Parse setup packet into request, locate data (eg descriptor) and populate TX buffer
 
 					} else if ((USB->EP0R & USB_EP_CTR_RX) != 0U) {
 						//PCD_CLEAR_RX_EP_CTR(hpcd->Instance, PCD_ENDP0);
-						USB->EP0R &= ~USB_EP_CTR_RX;
+						PCD_CLEAR_RX_EP_CTR(USB, 0);
+						//USB->EP0R &= ~USB_EP_CTR_RX;
 
 						xfer_count = USB_PMA->COUNT0_RX;
 						/* Get Control Data OUT Packet */
@@ -303,20 +321,30 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 		USB->ISTR &= ~USB_ISTR_RESET;
 
 		USB->EP0R |= (USB_EP_CONTROL | USB_EP_CTR_RX | USB_EP_CTR_TX);
-		USB->EP0R = ((USB->EP0R ^ USB_EP_RX_VALID) ^ USB_EP_TX_NAK);		// RX and TX status need to be set with XOR
-		USB->DADDR = USB_DADDR_EF;								// Enable endpoint and set address to 0
+		//USB->EP0R = ((USB->EP0R ^ USB_EP_RX_VALID) ^ USB_EP_TX_NAK);		// RX and TX status need to be set with XOR
 
 		// Configure the PMA for EP 0
 		USB_PMA->ADDR0_TX = 0x58;						// Offset of PMA used for EP0 TX
 		//USB_PMA->COUNT0_TX = 0x1C;
 		USB_PMA->ADDR0_RX = 0x18;						// Offset of PMA used for EP0 RX
 		USB_PMA->COUNT0_RX = (1 << USB_COUNT0_RX_BLSIZE_Pos) | (1 << USB_COUNT0_RX_NUM_BLOCK_Pos);		// configure block size = 1 (32 Bytes); number of blocks = 2 (64 bytes)
+
+		PCD_CLEAR_RX_DTOG(USB, 0);
+		PCD_SET_EP_RX_STATUS(USB, 0, USB_EP_RX_VALID);
+
+		PCD_CLEAR_TX_DTOG(USB, 0);
+		PCD_SET_EP_TX_STATUS(USB, 0, USB_EP_TX_NAK);
+
+		USB->DADDR = USB_DADDR_EF;								// Enable endpoint and set address to 0
+
+		/*
 		if (USB->EP0R & USB_EP_DTOG_TX) {
 			USB->EP0R = (USB->EP0R & USB_EPREG_MASK) | USB_EP_DTOG_TX;			// FIXME not sure where this needs to be set PCD_TX_DTOG
 		}
 		if (USB->EP0R & USB_EP_DTOG_RX) {
 			USB->EP0R = (USB->EP0R & USB_EPREG_MASK) | USB_EP_DTOG_RX;			// FIXME not sure where this needs to be set PCD_TX_DTOG
 		}
+		*/
 	}
 
 	/*
@@ -865,10 +893,10 @@ void USBHandler::USBD_StdDevReq()
 
 		case USB_REQ_SET_ADDRESS:
 			dev_addr = static_cast<uint8_t>(req.Value) & 0x7FU;
-			/*
-			USB->DADDR &= ~(USB_OTG_DCFG_DAD);
-			USBx_DEVICE->DCFG |= (static_cast<uint32_t>(dev_addr) << 4) & USB_OTG_DCFG_DAD;
-			*/
+
+			USB->DADDR &= ~(USB_DADDR);
+			USB->DADDR |= dev_addr;
+
 			ep0_state = USBD_EP0_STATUS_IN;
 			USB_EPStartXfer(Direction::in, 0, 0);
 			dev_state = USBD_STATE_ADDRESSED;
