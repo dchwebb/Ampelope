@@ -267,6 +267,7 @@ private:
 	uint32_t ep0_state;
 	uint8_t dev_state;
 	uint8_t CmdOpCode;				// stores class specific operation codes (eg CDC set line config)
+	uint8_t dev_address = 0;
 
 	struct usbRequest {
 		uint8_t mRequest;

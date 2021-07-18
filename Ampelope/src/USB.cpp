@@ -201,16 +201,10 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 
 	/////////// 	8000 		USB_ISTR_CTR: Correct Transfer
 	if (USB_ReadInterrupts(USB_ISTR_CTR)) {
-		uint8_t epindex;
-		uint8_t test = 0;
+
 		// stay in loop while pending interrupts Originally PCD_EP_ISR_Handler in
 		while ((USB->ISTR & USB_ISTR_CTR) != 0)	{
-			if (test > 0) {
-				int stop = 1;
-
-			} else {
-				test++;
-			}
+			uint8_t epindex;
 			wIstr = USB->ISTR;
 			epindex = wIstr & USB_ISTR_EP_ID;		// extract highest priority endpoint number
 
@@ -250,7 +244,7 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 
 						/* SETUP bit kept frozen while CTR_RX = 1 */
 
-						uint16_t ep0reg = USB->EP0R;
+						//uint16_t ep0reg = USB->EP0R;
 
 						PCD_CLEAR_RX_EP_CTR(USB, 0);
 						//USB->EP0R &= ~USB_EP_CTR_RX;
@@ -290,9 +284,9 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 			} else {
 				/* Decode and service non control endpoints interrupt */
 			}
-
+			USB->ISTR &= ~USB_ISTR_CTR;
 		}
-		USB->ISTR &= ~USB_ISTR_CTR;
+
 	}
 
 
@@ -894,12 +888,14 @@ void USBHandler::USBD_StdDevReq()
 		case USB_REQ_SET_ADDRESS:
 			dev_addr = static_cast<uint8_t>(req.Value) & 0x7FU;
 
-			USB->DADDR &= ~(USB_DADDR);
-			USB->DADDR |= dev_addr;
+			//USB->DADDR &= ~(USB_DADDR);
+			//USB->DADDR |= dev_addr;
 
 			ep0_state = USBD_EP0_STATUS_IN;
 			USB_EPStartXfer(Direction::in, 0, 0);
 			dev_state = USBD_STATE_ADDRESSED;
+
+
 			break;
 
 		case USB_REQ_SET_CONFIGURATION:
