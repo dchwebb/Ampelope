@@ -213,25 +213,21 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 
 				if ((wIstr & USB_ISTR_DIR) == 0U) {		// Direction IN
 					/* DIR = 0 implies that (EP_CTR_TX = 1) always */
+					PCD_CLEAR_TX_EP_CTR(USB, 0);
 
-					//USB->EP0R &= ~USB_EP_CTR_TX;
-					//USB->EP0R = (USB->EP0R & USB_EPREG_MASK) & ~USB_EP_TX_VALID;
-					PCD_SET_EP_TX_STATUS(USB, 0, USB_EP_TX_VALID);
+
+					//PCD_SET_EP_TX_STATUS(USB, 0, USB_EP_TX_VALID);
 					xfer_count = USB_PMA->COUNT0_TX & USB_COUNT0_TX_COUNT0_TX_Msk;
 					//xfer_buff += xfer_count;
 
-					// Sets TX status to stall, then eventually calls USB_EPStartXfer
-
-					//USB->EP0R ^= USB_EP_TX_STALL;
-					//USB->EP0R = (USB->EP0R & USB_EPREG_MASK) ^ USB_EP_TX_STALL;
 					PCD_SET_EP_TX_STATUS(USB, 0, USB_EP_TX_STALL);
 					USB_EPStartXfer(Direction::out, 0, 0);
-/*
-					if ((hpcd->USB_Address > 0U) && (ep->xfer_len == 0U)) {
-						USB->DADDR = ((uint16_t)hpcd->USB_Address | USB_DADDR_EF);
-						hpcd->USB_Address = 0U;
+
+					if (dev_address > 0 && xfer_count == 0U) {
+						USB->DADDR = (dev_address | USB_DADDR_EF);
+						dev_address = 0U;
 					}
-					*/
+
 				} else {			// Setup or OUT interrupt
 					/* DIR = 1 & CTR_RX => SETUP or OUT int */
 					/* DIR = 1 & (CTR_TX | CTR_RX) => 2 int pending */
@@ -869,7 +865,7 @@ void USBHandler::IntToUnicode(uint32_t value, uint8_t* pbuf, uint8_t len) {
 
 void USBHandler::USBD_StdDevReq()
 {
-	uint8_t dev_addr;
+	//uint8_t dev_addr;
 	switch (req.mRequest & USB_REQ_TYPE_MASK)
 	{
 	case USB_REQ_TYPE_CLASS:
@@ -886,7 +882,7 @@ void USBHandler::USBD_StdDevReq()
 			break;
 
 		case USB_REQ_SET_ADDRESS:
-			dev_addr = static_cast<uint8_t>(req.Value) & 0x7FU;
+			dev_address = static_cast<uint8_t>(req.Value) & 0x7FU;
 
 			//USB->DADDR &= ~(USB_DADDR);
 			//USB->DADDR |= dev_addr;
