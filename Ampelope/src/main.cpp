@@ -1,10 +1,12 @@
 #include "initialisation.h"
 #include "envelope.h"
 #include "usb.h"
+#include "uartHandler.h"
 
 volatile uint32_t SysTickVal;
 volatile uint16_t ADC_array[ADC_BUFFER_LENGTH];
 
+uint32_t buttonDebounce;
 uint16_t x = 0;
 Envelope envelope;
 USBHandler usb;
@@ -38,6 +40,12 @@ int main(void)
 
 		DAC->DHR12R2 = 4095 - x;
 
+		if ((GPIOC->IDR & GPIO_IDR_ID13) != 0 && SysTickVal > buttonDebounce + 1000) {
+			buttonDebounce = SysTickVal;
+			usb.OutputDebug();
+			//uartSendString("hello");
+
+		}
 
 	}
 }

@@ -989,38 +989,40 @@ void USBHandler::SendString(std::string s) {
 
 #if (USB_DEBUG)
 
-//std::string IntToString(const int32_t& v) {
-//	std::stringstream ss;
-//	ss << v;
-//	return ss.str();
-//}
-/*
-std::string HexToString(const uint32_t& v, const bool& spaces) {
-	std::stringstream ss;
-	ss << std::uppercase << std::setfill('0') << std::setw(8) << std::hex << v;
-	if (spaces) {
-		//std::string s = ss.str();
-		return ss.str().insert(2, " ").insert(5, " ").insert(8, " ");
-	}
-	return ss.str();
-}
-
-std::string HexByte(const uint16_t& v) {
-	std::stringstream ss;
-	ss << std::uppercase << std::setfill('0') << std::setw(2) << std::hex << v;
-	return ss.str();
-}
-
 void USBHandler::OutputDebug() {
 	USBDebug = false;
 
-	SendString("Event,Interrupt,Desc,Int Data,Desc,Endpoint,mRequest,Request,Value,Index,Length,PacketSize,XferBuff0,XferBuff1,\n");
+	uartSendString("Event,Interrupt,Desc,Int Data,Desc,Endpoint,mRequest,Request,Value,Index,Length,PacketSize,XferBuff0,XferBuff1,\n");
 	uint16_t evNo = usbDebugEvent % USB_DEBUG_COUNT;
 	std::string interrupt, subtype;
 	for (int i = 0; i < USB_DEBUG_COUNT; ++i) {
+		if ((usbDebug[evNo].Interrupt & USB_ISTR_CTR) == USB_ISTR_CTR) {
+			if ((usbDebug[evNo].Interrupt & USB_ISTR_DIR) == USB_ISTR_DIR) {
+				interrupt = "CTR_OUT";
+			} else {
+				interrupt = "CTR_IN";
+			}
+		}
+
+		if ((usbDebug[evNo].Interrupt & USB_ISTR_SUSP) == USB_ISTR_SUSP) {
+			interrupt = "SUSP";
+		}
+
+		if ((usbDebug[evNo].Interrupt & USB_ISTR_WKUP) == USB_ISTR_WKUP) {
+			interrupt = "WKUP";
+		}
+
+
+		if ((usbDebug[evNo].Interrupt & USB_ISTR_RESET) == USB_ISTR_RESET) {
+			interrupt = "RESET";
+		}
+
+
+
+		/*
 		switch (usbDebug[evNo].Interrupt) {
-		case USB_OTG_GINTSTS_RXFLVL:
-			interrupt = "RXFLVL";
+		case USB_ISTR_CTR:
+			interrupt = "CTR";
 
 			switch ((usbDebug[evNo].IntData & USB_OTG_GRXSTSP_PKTSTS) >> 17) {
 			case STS_DATA_UPDT:			// 2 = OUT data packet received
@@ -1040,21 +1042,17 @@ void USBHandler::OutputDebug() {
 			}
 
 			break;
-		case USB_OTG_GINTSTS_SRQINT:
-			interrupt = "SRQINT";
+
+		case USB_ISTR_SUSP:
+			interrupt = "SUSP";
 			break;
-		case USB_OTG_GINTSTS_USBSUSP:
-			interrupt = "USBSUSP";
+		case USB_ISTR_WKUP:
+			interrupt = "WKUP";
 			break;
-		case USB_OTG_GINTSTS_WKUINT:
-			interrupt = "WKUINT";
+		case USB_ISTR_RESET:
+			interrupt = "RESET";
 			break;
-		case USB_OTG_GINTSTS_USBRST:
-			interrupt = "USBRST";
-			break;
-		case USB_OTG_GINTSTS_ENUMDNE:
-			interrupt = "ENUMDNE";
-			break;
+
 		case USB_OTG_GINTSTS_OEPINT:
 			interrupt = "OEPINT";
 
@@ -1128,9 +1126,9 @@ void USBHandler::OutputDebug() {
 		default:
 			interrupt = "";
 		}
-
+*/
 		if (usbDebug[evNo].Interrupt != 0) {
-			SendString(std::to_string(usbDebug[evNo].eventNo) + ","
+			uartSendString(std::to_string(usbDebug[evNo].eventNo) + ","
 					+ HexToString(usbDebug[evNo].Interrupt, false) + "," + interrupt + ","
 					+ HexToString(usbDebug[evNo].IntData, false) + "," + subtype + ","
 					+ std::to_string(usbDebug[evNo].endpoint) + ","
@@ -1146,7 +1144,7 @@ void USBHandler::OutputDebug() {
 		evNo = (evNo + 1) % USB_DEBUG_COUNT;
 	}
 }
-*/
+
 
 /* startup sequence:
 0		40000000 SRQINT 	Session request/new session detected

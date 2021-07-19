@@ -7,7 +7,7 @@
 // Enables capturing of debug data for output over STLink UART on dev boards
 #define USB_DEBUG true
 #if (USB_DEBUG)
-//#include "uartHandler.h"
+#include "uartHandler.h"
 extern bool USBDebug;
 #define USB_DEBUG_COUNT 400
 #endif

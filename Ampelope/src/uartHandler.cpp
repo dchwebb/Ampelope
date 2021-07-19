@@ -36,18 +36,22 @@ void InitUart() {
 	USART1->CR1 |= USART_CR1_UE;					// USART Enable
 
 	// configure PC13 user button on nucleo board
-//	RCC->AHB4ENR |= RCC_AHB4ENR_GPIOCEN;			// GPIO port clock
-//	GPIOC->MODER &= ~GPIO_MODER_MODE13_Msk;
+	GPIOC->MODER &= ~GPIO_MODER_MODE13_Msk;
 
 }
 
+
 std::string IntToString(const int32_t& v) {
-	std::stringstream ss;
-	ss << v;
-	return ss.str();
+	return std::to_string(v);
 }
 
 std::string HexToString(const uint32_t& v, const bool& spaces) {
+	char buf[50];
+	sprintf(buf, "%X", v);
+	return std::string(buf);
+//	std::string(buf).append("\r\n")
+
+	/*
 	std::stringstream ss;
 	ss << std::uppercase << std::setfill('0') << std::setw(8) << std::hex << v;
 	if (spaces) {
@@ -55,12 +59,17 @@ std::string HexToString(const uint32_t& v, const bool& spaces) {
 		return ss.str().insert(2, " ").insert(5, " ").insert(8, " ");
 	}
 	return ss.str();
+	*/
 }
 
 std::string HexByte(const uint16_t& v) {
-	std::stringstream ss;
-	ss << std::uppercase << std::setfill('0') << std::setw(2) << std::hex << v;
-	return ss.str();
+	char buf[50];
+	sprintf(buf, "%X", v);
+	return std::string(buf);
+
+//	std::stringstream ss;
+//	ss << std::uppercase << std::setfill('0') << std::setw(2) << std::hex << v;
+//	return ss.str();
 }
 
 void uartSendChar(char c) {
