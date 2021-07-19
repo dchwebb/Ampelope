@@ -24,6 +24,7 @@ int main(void)
 	InitIO();
 	InitEnvTimer();
 	InitADC();
+	InitUart();
 
 	usb.InitUSB();
 

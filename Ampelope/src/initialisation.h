@@ -21,6 +21,7 @@ void InitDAC();
 void InitIO();
 void InitEnvTimer();
 void InitADC();
+void InitUart();
 
 /*
 void InitCoverageTimer();
