@@ -53,14 +53,6 @@ void USBHandler::USB_ReadPMA(uint16_t wPMABufAddr, uint16_t wNBytes)
 	}
 }
 
-/**
- * @brief Copy a buffer from user memory area to packet memory area (PMA)
- * @param   USBx USB peripheral instance register address.
- * @param   pbUsrBuf pointer to user memory area.
- * @param   wPMABufAddr address into PMA.
- * @param   wNBytes no. of bytes to be copied.
- * @retval None
- */
 void USBHandler::USB_WritePMA(uint16_t wPMABufAddr, uint16_t wNBytes)
 {
 	uint32_t n = ((uint32_t)wNBytes + 1U) >> 1;
@@ -81,29 +73,6 @@ void USBHandler::USB_WritePMA(uint16_t wPMABufAddr, uint16_t wNBytes)
 	}
 }
 
-/*
-void USBHandler::USBD_ParseSetupRequest()
-{
-	uint8_t *pbuff = (uint8_t *)(&xfer_buff);
-	req.loadData(pbuff);
-
-	req.mRequest = *(uint8_t *)(pbuff);
-
-	pbuff++;
-	req.Request = *(uint8_t *)(pbuff);
-
-	pbuff++;
-	req.Value = SWAPBYTE(pbuff);
-
-	pbuff++;
-	pbuff++;
-	req.Index = SWAPBYTE(pbuff);
-
-	pbuff++;
-	pbuff++;
-	req.Length = SWAPBYTE(pbuff);
-}
-*/
 
 void USBHandler::USBD_LL_SetupStage()
 {
@@ -138,15 +107,11 @@ void USBHandler::USBD_LL_SetupStage()
 }
 
 // USB_EPStartXfer setup and starts a transfer over an EP
-//void USB_EPStartXfer(USB_EPTypeDef *ep)
 void USBHandler::USB_EPStartXfer(Direction direction, uint8_t endpoint, uint32_t xfer_len)
 {
 	uint32_t len;
-	uint16_t pmabuffer;
-	uint16_t wEPVal;
 
-	/* IN endpoint */
-	if (direction == Direction::in) {
+	if (direction == Direction::in) {		// IN endpoint
 		// Multi packet transfer
 		if (xfer_len > ep_maxPacket) {
 			len = ep_maxPacket;
@@ -183,8 +148,8 @@ void USBHandler::USB_EPStartXfer(Direction direction, uint8_t endpoint, uint32_t
 
 void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src\stm32f4xx_hal_pcd.c
 
-	uint16_t count, wIstr, wEPVal, TxByteNbre;
-	int epnum, ep_intr, epint;
+	uint16_t wIstr, wEPVal;
+	int epint;
 
 	// Handle spurious interrupt
 	if ((USB->ISTR) == 0)
@@ -195,15 +160,15 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 	/////////// 	8000 		USB_ISTR_CTR: Correct Transfer
 	if (USB_ReadInterrupts(USB_ISTR_CTR)) {
 
-		if (usbDebugNo == 12) {
-			int susp = 1;
-		}
-
 		// stay in loop while pending interrupts Originally PCD_EP_ISR_Handler in
 		while ((USB->ISTR & USB_ISTR_CTR) != 0)	{
 			uint8_t epindex;
 			wIstr = USB->ISTR;
 			epindex = wIstr & USB_ISTR_EP_ID;		// extract highest priority endpoint number
+
+			if (usbDebugNo == 5) {
+				int susp = 1;
+			}
 
 			if (epindex == 0U) {
 				/* Decode and service control endpoint interrupt */
@@ -258,7 +223,7 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 							// FIXME: not using correct calculations for number of blocks
 							//PCD_SET_EP_RX_CNT(hpcd->Instance, PCD_ENDP0, ep->maxpacket);
 
-							USB_PMA->COUNT0_RX = (1 << USB_COUNT0_RX_NUM_BLOCK_Pos);		// configure block size = 1 (32 Bytes); number of blocks = 2 (64 bytes)
+							USB_PMA->COUNT0_RX |= (1 << USB_COUNT0_RX_NUM_BLOCK_Pos);		// configure block size = 1 (32 Bytes); number of blocks = 2 (64 bytes)
 							PCD_SET_EP_RX_STATUS(USB, 0, USB_EP_RX_VALID);
 						}
 
