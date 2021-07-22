@@ -183,8 +183,20 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 					outBuff += xfer_count;
 
 					// ~Fixme handle remaining data - see rem_length
-					PCD_SET_EP_TX_STATUS(USB, 0, USB_EP_TX_STALL);
-					USB_EPStartXfer(Direction::out, 0, 0);
+					if (ep0_state == USBD_EP0_DATA_IN) {
+						if (xfer_rem > ep_maxPacket) {
+							xfer_rem -= ep_maxPacket;
+							USB_EPStartXfer(Direction::in, 0, xfer_rem);
+
+							/* Prepare endpoint for premature end of transfer */
+							//(void)USBD_LL_PrepareReceive(pdev, 0U, NULL, 0U);
+							USB_EPStartXfer(Direction::out, 0, 0);
+						} else {
+							// FIXME if (rem_length ==  maxpacket) etc - where non zero size packet and last packet is a multiple of max packet size
+							PCD_SET_EP_TX_STATUS(USB, 0, USB_EP_TX_STALL);
+							USB_EPStartXfer(Direction::out, 0, 0);
+						}
+					}
 
 					if (dev_address > 0 && xfer_count == 0U) {
 						USB->DADDR = (dev_address | USB_DADDR_EF);
@@ -770,6 +782,7 @@ void USBHandler::USBD_GetDescriptor() {
 #endif
 
 		ep0_state = USBD_EP0_DATA_IN;
+		xfer_rem = outBuffSize;		// See USBD_CtlSendData
 		outBuffSize = std::min(outBuffSize, static_cast<uint32_t>(req.Length));
 		USB_EPStartXfer(Direction::in, 0, outBuffSize);
 	}
