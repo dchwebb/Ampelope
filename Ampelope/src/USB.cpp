@@ -154,13 +154,9 @@ void USBHandler::USB_EPStartXfer(Direction direction, uint8_t endpoint, uint32_t
 			len = xfer_len;
 		}
 
-		/* configure and validate Tx endpoint */
-
 		USB_WritePMA(0x58, len);
 		USB_PMA->COUNT0_TX = len;
 
-		//USB->EP0R ^= USB_EP_TX_VALID;
-		//USB->EP0R = (USB->EP0R & USB_EPREG_MASK) ^ USB_EP_TX_VALID;
 		PCD_SET_EP_TX_STATUS(USB, 0, USB_EP_TX_VALID);
 	} else {		// OUT endpoint
 
@@ -180,9 +176,6 @@ void USBHandler::USB_EPStartXfer(Direction direction, uint8_t endpoint, uint32_t
 			USB_PMA->COUNT0_RX |= (1 << USB_COUNT0_RX_NUM_BLOCK_Pos);		// configure block size = 1 (32 Bytes); number of blocks = 2 (64 bytes)
 		}
 
-		//PCD_SET_EP_RX_STATUS(USBx, ep->num, USB_EP_RX_VALID);
-		//USB->EP0R ^= USB_EP_RX_VALID;
-		//USB->EP0R = (USB->EP0R & USB_EPREG_MASK) ^ USB_EP_RX_VALID;
 		PCD_SET_EP_RX_STATUS(USB, 0, USB_EP_RX_VALID);
 	}
 }
@@ -202,6 +195,10 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 	/////////// 	8000 		USB_ISTR_CTR: Correct Transfer
 	if (USB_ReadInterrupts(USB_ISTR_CTR)) {
 
+		if (usbDebugNo == 12) {
+			int susp = 1;
+		}
+
 		// stay in loop while pending interrupts Originally PCD_EP_ISR_Handler in
 		while ((USB->ISTR & USB_ISTR_CTR) != 0)	{
 			uint8_t epindex;
@@ -215,11 +212,12 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 					/* DIR = 0 implies that (EP_CTR_TX = 1) always */
 					PCD_CLEAR_TX_EP_CTR(USB, 0);
 
-
 					//PCD_SET_EP_TX_STATUS(USB, 0, USB_EP_TX_VALID);
 					xfer_count = USB_PMA->COUNT0_TX & USB_COUNT0_TX_COUNT0_TX_Msk;
 					//xfer_buff += xfer_count;
+					outBuff += xfer_count;
 
+					// ~Fixme handle remaining data - see rem_length
 					PCD_SET_EP_TX_STATUS(USB, 0, USB_EP_TX_STALL);
 					USB_EPStartXfer(Direction::out, 0, 0);
 
@@ -231,56 +229,45 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 				} else {			// Setup or OUT interrupt
 					/* DIR = 1 & CTR_RX => SETUP or OUT int */
 					/* DIR = 1 & (CTR_TX | CTR_RX) => 2 int pending */
-					//ep = &hpcd->OUT_ep[0];
-					//wEPVal = PCD_GET_ENDPOINT(hpcd->Instance, PCD_ENDP0);
 
 					if ((USB->EP0R & USB_EP_SETUP) != 0) {
 						xfer_count = USB_PMA->COUNT0_RX & USB_COUNT0_RX_COUNT0_RX_Msk;
 						USB_ReadPMA(0x18, xfer_count);		// Read setup data into xfer_buff
 
-						/* SETUP bit kept frozen while CTR_RX = 1 */
+						PCD_CLEAR_RX_EP_CTR(USB, 0);	// clears 8000 interrupt
 
-						//uint16_t ep0reg = USB->EP0R;
-
-						PCD_CLEAR_RX_EP_CTR(USB, 0);
-						//USB->EP0R &= ~USB_EP_CTR_RX;
-
-						// Botch to try and avoid the data0/data1 bit toggling incorrectly when setting other values in EP0R
-//						if (ep0reg & USB_EP_DTOG_TX) {
-//							USB->EP0R = (USB->EP0R & USB_EPREG_MASK) | USB_EP_DTOG_TX;
-//						}
-//						uint16_t tmpb = USB->EP0R;
 						USBD_LL_SetupStage();				// Parse setup packet into request, locate data (eg descriptor) and populate TX buffer
 
 					} else if ((USB->EP0R & USB_EP_CTR_RX) != 0U) {
-						//PCD_CLEAR_RX_EP_CTR(hpcd->Instance, PCD_ENDP0);
 						PCD_CLEAR_RX_EP_CTR(USB, 0);
-						//USB->EP0R &= ~USB_EP_CTR_RX;
 
-						xfer_count = USB_PMA->COUNT0_RX;
+						xfer_count = USB_PMA->COUNT0_RX & USB_COUNT0_RX_COUNT0_RX;
 						/* Get Control Data OUT Packet */
 						//ep->xfer_count = PCD_EP_RX_CNT(hpcd->Instance, ep->num);
 
 						if ((xfer_count != 0U) && (xfer_buff != 0U)) {
-							//USB_ReadPMA(xfer_buff,	ep->pmaadress, xfer_count);
+							USB_ReadPMA(0x18, xfer_count);
 
 							//xfer_buff += xfer_count;
 
 							/* Process Control Data OUT Packet */
 							//HAL_PCD_DataOutStageCallback(hpcd, 0U);
 						}
-/*
-						if ((PCD_GET_ENDPOINT(hpcd->Instance, PCD_ENDP0) & USB_EP_SETUP) == 0U) {
-							PCD_SET_EP_RX_CNT(hpcd->Instance, PCD_ENDP0, ep->maxpacket);
-							PCD_SET_EP_RX_STATUS(hpcd->Instance, PCD_ENDP0, USB_EP_RX_VALID);
+
+						if ((USB->EP0R & USB_EP_SETUP) == 0) {
+							// FIXME: not using correct calculations for number of blocks
+							//PCD_SET_EP_RX_CNT(hpcd->Instance, PCD_ENDP0, ep->maxpacket);
+
+							USB_PMA->COUNT0_RX = (1 << USB_COUNT0_RX_NUM_BLOCK_Pos);		// configure block size = 1 (32 Bytes); number of blocks = 2 (64 bytes)
+							PCD_SET_EP_RX_STATUS(USB, 0, USB_EP_RX_VALID);
 						}
-						*/
+
 					}
 				}
 			} else {
 				/* Decode and service non control endpoints interrupt */
 			}
-			USB->ISTR &= ~USB_ISTR_CTR;
+			//USB->ISTR &= ~USB_ISTR_CTR;
 		}
 
 	}
@@ -327,14 +314,6 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 
 		USB->DADDR = USB_DADDR_EF;								// Enable endpoint and set address to 0
 
-		/*
-		if (USB->EP0R & USB_EP_DTOG_TX) {
-			USB->EP0R = (USB->EP0R & USB_EPREG_MASK) | USB_EP_DTOG_TX;			// FIXME not sure where this needs to be set PCD_TX_DTOG
-		}
-		if (USB->EP0R & USB_EP_DTOG_RX) {
-			USB->EP0R = (USB->EP0R & USB_EPREG_MASK) | USB_EP_DTOG_RX;			// FIXME not sure where this needs to be set PCD_TX_DTOG
-		}
-		*/
 	}
 
 	/*
@@ -999,6 +978,48 @@ void USBHandler::OutputDebug() {
 		if ((usbDebug[evNo].Interrupt & USB_ISTR_CTR) == USB_ISTR_CTR) {
 			if ((usbDebug[evNo].Interrupt & USB_ISTR_DIR) == USB_ISTR_DIR) {
 				interrupt = "CTR_OUT";
+				if (usbDebug[evNo].Request.Request == 6) {
+					switch (usbDebug[evNo].Request.Value >> 8)	{
+					case USB_DESC_TYPE_DEVICE:
+						subtype = "Get Device Descriptor";
+						break;
+					case USB_DESC_TYPE_CONFIGURATION:
+						subtype = "Get Configuration Descriptor";
+						break;
+					case USB_DESC_TYPE_BOS:
+						subtype = "Get BOS Descriptor";
+						break;
+
+					case USB_DESC_TYPE_STRING:
+
+						switch ((uint8_t)(req.Value)) {
+						case USBD_IDX_LANGID_STR:			// 300
+							subtype = "Get Lang Str Descriptor";
+							break;
+						case USBD_IDX_MFC_STR:				// 301
+							subtype = "Get Manufacturor Str Descriptor";
+							break;
+						case USBD_IDX_PRODUCT_STR:			// 302
+							subtype = "Get Product Str Descriptor";
+							break;
+						case USBD_IDX_SERIAL_STR:			// 303
+							subtype = "Get Serial Str Descriptor";
+							break;
+					    case USBD_IDX_CDC_STR:				// 304
+							subtype = "Get CDC Str Descriptor";
+					      break;
+						}
+
+					default:
+						subtype = "Get Descriptor";
+					}
+				} else if (usbDebug[evNo].Request.Request == 5) {
+					subtype = "Set Address to " + std::to_string(usbDebug[evNo].Request.Value);
+				} else if (usbDebug[evNo].Request.Request == 9) {
+					subtype = "SET_CONFIGURATION";
+				} else {
+					subtype = "Setup phase done";
+				}
 			} else {
 				interrupt = "CTR_IN";
 			}
