@@ -73,6 +73,93 @@ void USBHandler::USB_WritePMA(uint16_t wPMABufAddr, uint16_t wNBytes)
 	}
 }
 
+/*
+	if ((req.mRequest & USB_REQ_TYPE_MASK) == USB_REQ_TYPE_CLASS) {		// 0xA1 & 0x60 == 0x20
+
+		if (req.Length > 0) {
+			if ((req.mRequest & USB_REQ_DIRECTION_MASK) != 0U) {		// Device to host [USBD_CtlSendData]
+				// CDC request 0xA1, 0x21, 0x0, 0x0, 0x7		GetLineCoding 0xA1 0x21 0 Interface 7; Data: Line Coding Data Structure
+				// 0xA1 [1|01|00001] Device to host | Class | Interface
+
+				outBuffSize = req.Length;
+				outBuff = (uint8_t*)&USBD_CDC_LineCoding;
+				ep0_state = USBD_EP0_DATA_IN;
+
+#if (USB_DEBUG)
+				usbDebug[usbDebugNo].PacketSize = outBuffSize;
+				usbDebug[usbDebugNo].xferBuff0 = ((uint32_t*)outBuff)[0];
+				usbDebug[usbDebugNo].xferBuff1 = ((uint32_t*)outBuff)[1];
+#endif
+
+				USB_EPStartXfer(Direction::in, 0, req.Length);		// sends blank request back
+			} else {
+				//CDC request 0x21, 0x20, 0x0, 0x0, 0x7			// USBD_CtlPrepareRx
+				// 0x21 [0|01|00001] Host to device | Class | Interface
+				CmdOpCode = req.Request;
+				USB_EPStartXfer(Direction::out, epnum, req.Length);
+			}
+		} else {
+			// 0x21, 0x22, 0x0, 0x0, 0x0	SetControlLineState 0x21 | 0x22 | 2 | Interface | 0 | None
+			// 0x21, 0x20, 0x0, 0x0, 0x0	SetLineCoding       0x21 | 0x20 | 0 | Interface | 0 | Line Coding Data Structure
+			USB_EPStartXfer(Direction::in, 0, 0);
+		}
+ */
+void USBHandler::USBD_StdItfReq() {
+	switch (req.mRequest & USB_REQ_TYPE_MASK)
+	{
+	case USB_REQ_TYPE_CLASS:
+	case USB_REQ_TYPE_VENDOR:
+	case USB_REQ_TYPE_STANDARD:
+		switch (dev_state)
+		{
+		case USBD_STATE_DEFAULT:
+		case USBD_STATE_ADDRESSED:
+		case USBD_STATE_CONFIGURED:
+			switch (req.mRequest & USB_REQ_TYPE_MASK) {
+			case USB_REQ_TYPE_CLASS:
+				if (req.Length != 0U)	{
+					if ((req.mRequest & USB_REQ_DIRECTION_MASK) != 0U)	{		// Device to host
+						//((USBD_CDC_ItfTypeDef *)pdev->pUserData)->Control(req.Request, (uint8_t *)hcdc->data, req.Length);
+
+						//len = req.Length;
+						//(void)USBD_CtlSendData(pdev, (uint8_t *)hcdc->data, len);
+						USB_EPStartXfer(Direction::in, 0, req.Length);
+					} else {
+						CmdOpCode = req.Request;
+						int epnum = 0;		// FIXME
+						USB_EPStartXfer(Direction::out, epnum, req.Length);
+//						hcdc->CmdLength = (uint8_t)req.Length;
+//
+//						(void)USBD_CtlPrepareRx(pdev, (uint8_t *)hcdc->data, req.Length);
+					}
+				} else {
+					//((USBD_CDC_ItfTypeDef *)pdev->pUserData)->Control(req.Request, (uint8_t *)req, 0U);
+					// 0x21, 0x22, 0x0, 0x0, 0x0	SetControlLineState 0x21 | 0x22 | 2 | Interface | 0 | None
+					// 0x21, 0x20, 0x0, 0x0, 0x0	SetLineCoding       0x21 | 0x20 | 0 | Interface | 0 | Line Coding Data Structure
+					USB_EPStartXfer(Direction::in, 0, 0);
+
+				}
+				break;
+			}
+
+
+			if (req.Length == 0) {
+				//USBD_CtlSendStatus();
+			}
+
+			break;
+
+		default:
+			USBD_CtlError();
+			break;
+		}
+		break;
+
+		default:
+			USBD_CtlError();
+			break;
+	}
+}
 
 void USBHandler::USBD_LL_SetupStage()
 {
@@ -92,7 +179,7 @@ void USBHandler::USBD_LL_SetupStage()
 		break;
 
 	case USB_REQ_RECIPIENT_INTERFACE:
-		//USBD_StdItfReq(pdev, &pdev->request);
+		USBD_StdItfReq();
 		break;
 
 	case USB_REQ_RECIPIENT_ENDPOINT:
@@ -166,7 +253,7 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 			wIstr = USB->ISTR;
 			epindex = wIstr & USB_ISTR_EP_ID;		// extract highest priority endpoint number
 
-			if (usbDebugNo == 5) {
+			if (usbDebugNo == 24) {
 				int susp = 1;
 			}
 
@@ -242,6 +329,7 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 					}
 				}
 			} else {
+				int stop = 1;
 				/* Decode and service non control endpoints interrupt */
 			}
 			//USB->ISTR &= ~USB_ISTR_CTR;
@@ -899,10 +987,8 @@ void USBHandler::USBD_StdDevReq()
 }
 
 void USBHandler::USBD_CtlError() {
-	/*
-	USBx_INEP(0)->DIEPCTL |= USB_OTG_DIEPCTL_STALL;
-	USBx_OUTEP(0)->DOEPCTL |= USB_OTG_DOEPCTL_STALL;
-	*/
+	PCD_SET_EP_TX_STATUS(USB, 0, USB_EP_TX_STALL);
+	//PCD_SET_EP_RX_STATUS(USB, 0, USB_EP_TX_STALL);
 }
 
 

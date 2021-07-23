@@ -244,6 +244,7 @@ private:
 	void USBD_LL_SetupStage();
 	void USB_ReadPMA(uint16_t wPMABufAddr, uint16_t wNBytes);
 	void USB_WritePMA(uint16_t wPMABufAddr, uint16_t wNBytes);
+	void USBD_StdItfReq();
 
 	void USB_ActivateEndpoint(uint8_t endpoint, Direction direction, EndPointType eptype);
 	void USB_ReadPacket(uint32_t* dest, uint16_t len);
