@@ -3,15 +3,7 @@
 bool USBDebug = true;
 
 
-/*
- *
- * PMAAddress constants - not sure where they come from
-HAL_PCDEx_PMAConfig((PCD_HandleTypeDef*)pdev->pData , 0x00 , PCD_SNG_BUF, 0x18);
-HAL_PCDEx_PMAConfig((PCD_HandleTypeDef*)pdev->pData , 0x80 , PCD_SNG_BUF, 0x58);
-HAL_PCDEx_PMAConfig((PCD_HandleTypeDef*)pdev->pData , 0x81 , PCD_SNG_BUF, 0xC0);
-HAL_PCDEx_PMAConfig((PCD_HandleTypeDef*)pdev->pData , 0x01 , PCD_SNG_BUF, 0x110);
-HAL_PCDEx_PMAConfig((PCD_HandleTypeDef*)pdev->pData , 0x82 , PCD_SNG_BUF, 0x100);
-*/
+
 
 __STATIC_INLINE uint16_t SWAPBYTE(uint8_t *addr)
 {
@@ -119,12 +111,12 @@ void USBHandler::USBD_StdItfReq() {
 			case USB_REQ_TYPE_CLASS:
 				if (req.Length != 0U)	{
 					if ((req.mRequest & USB_REQ_DIRECTION_MASK) != 0U)	{		// Device to host
-						//((USBD_CDC_ItfTypeDef *)pdev->pUserData)->Control(req.Request, (uint8_t *)hcdc->data, req.Length);
-
-						//len = req.Length;
-						//(void)USBD_CtlSendData(pdev, (uint8_t *)hcdc->data, len);
+						// CDC request 0xA1, 0x21, 0x0, 0x0, 0x7		GetLineCoding 0xA1 0x21 0 Interface 7; Data: Line Coding Data Structure
+						// 0xA1 [1|01|00001] Device to host | Class | Interface
 						USB_EPStartXfer(Direction::in, 0, req.Length);
 					} else {
+						//CDC request 0x21, 0x20, 0x0, 0x0, 0x7
+						// 0x21 [0|01|00001] Host to device | Class | Interface
 						CmdOpCode = req.Request;
 						int epnum = 0;		// FIXME
 						USB_EPStartXfer(Direction::out, epnum, req.Length);
@@ -269,7 +261,6 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 					//xfer_buff += xfer_count;
 					outBuff += xfer_count;
 
-					// ~Fixme handle remaining data - see rem_length
 					if (ep0_state == USBD_EP0_DATA_IN) {
 						if (xfer_rem > ep_maxPacket) {
 							xfer_rem -= ep_maxPacket;
@@ -362,6 +353,7 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 	if (USB_ReadInterrupts(USB_ISTR_RESET))	{
 		USB->ISTR &= ~USB_ISTR_RESET;
 
+		// FIXME - use USB_ActivateEndpoint
 		USB->EP0R |= (USB_EP_CONTROL | USB_EP_CTR_RX | USB_EP_CTR_TX);
 		//USB->EP0R = ((USB->EP0R ^ USB_EP_RX_VALID) ^ USB_EP_TX_NAK);		// RX and TX status need to be set with XOR
 
@@ -731,10 +723,27 @@ void USBHandler::InitUSB()
 }
 
 
-void USBHandler::USB_ActivateEndpoint(uint8_t endpoint, Direction direction, EndPointType eptype)
+void USBHandler::USB_ActivateEndpoint(uint8_t endpoint, Direction direction, uint16_t eptype, uint16_t pmaAddress)
 {
 	endpoint = endpoint & 0xF;
-/*
+
+	*(volatile uint16_t *)(&(USB)->EP0R + ((endpoint) * 2U)) |= (endpoint | eptype | USB_EP_CTR_RX | USB_EP_CTR_TX);		// Set the address (EA=endpoint) and type (EP_TYPE=eptype)
+
+	if (direction == Direction::in) {
+		// Configure the PMA for EP 0
+		USB_PMA->ADDR0_TX = pmaAddress;						// Offset of PMA used for EP0 TX
+
+		PCD_CLEAR_TX_DTOG(USB, endpoint);
+		PCD_SET_EP_TX_STATUS(USB, endpoint, USB_EP_TX_NAK);
+	} else {
+		USB_PMA->ADDR0_RX = pmaAddress;						// Offset of PMA used for EP0 RX
+		USB_PMA->COUNT0_RX = (1 << USB_COUNT0_RX_BLSIZE_Pos) | (1 << USB_COUNT0_RX_NUM_BLOCK_Pos);		// configure block size = 1 (32 Bytes); number of blocks = 2 (64 bytes)
+
+		PCD_CLEAR_RX_DTOG(USB, 0);
+		PCD_SET_EP_RX_STATUS(USB, 0, USB_EP_RX_VALID);
+
+	}
+	/*
 	if (direction == Direction::in) {
 		USBx_DEVICE->DAINTMSK |= USB_OTG_DAINTMSK_IEPM & static_cast<uint32_t>(1UL << (endpoint & EP_ADDR_MASK));
 
@@ -929,23 +938,28 @@ void USBHandler::USBD_StdDevReq()
 		case USB_REQ_SET_ADDRESS:
 			dev_address = static_cast<uint8_t>(req.Value) & 0x7FU;
 
-			//USB->DADDR &= ~(USB_DADDR);
-			//USB->DADDR |= dev_addr;
-
 			ep0_state = USBD_EP0_STATUS_IN;
 			USB_EPStartXfer(Direction::in, 0, 0);
 			dev_state = USBD_STATE_ADDRESSED;
-
-
 			break;
 
 		case USB_REQ_SET_CONFIGURATION:
 			if (dev_state == USBD_STATE_ADDRESSED) {
 				dev_state = USBD_STATE_CONFIGURED;
 
-				USB_ActivateEndpoint(CDC_In,   Direction::in,  Bulk);			// Activate CDC in endpoint
-				USB_ActivateEndpoint(CDC_Out,  Direction::out, Bulk);			// Activate CDC out endpoint
-				USB_ActivateEndpoint(CDC_Cmd,  Direction::in,  Interrupt);		// Activate Command IN EP
+				/*
+				 *
+				 * PMAAddress constants - not sure where they come from
+				HAL_PCDEx_PMAConfig((PCD_HandleTypeDef*)pdev->pData , 0x00 , PCD_SNG_BUF, 0x18);
+				HAL_PCDEx_PMAConfig((PCD_HandleTypeDef*)pdev->pData , 0x80 , PCD_SNG_BUF, 0x58);
+				HAL_PCDEx_PMAConfig((PCD_HandleTypeDef*)pdev->pData , 0x81 , PCD_SNG_BUF, 0xC0);
+				HAL_PCDEx_PMAConfig((PCD_HandleTypeDef*)pdev->pData , 0x01 , PCD_SNG_BUF, 0x110);
+				HAL_PCDEx_PMAConfig((PCD_HandleTypeDef*)pdev->pData , 0x82 , PCD_SNG_BUF, 0x100);
+				*/
+
+				USB_ActivateEndpoint(CDC_In,   Direction::in,  Bulk, 0xC0);			// Activate CDC in endpoint
+				USB_ActivateEndpoint(CDC_Out,  Direction::out, Bulk, 0x110);			// Activate CDC out endpoint
+				USB_ActivateEndpoint(CDC_Cmd,  Direction::in,  Interrupt, 0x100);		// Activate Command IN EP
 				//USB_ActivateEndpoint(MIDI_In,  Direction::in,  Bulk);			// Activate MIDI in endpoint
 				//USB_ActivateEndpoint(MIDI_Out, Direction::out, Bulk);			// Activate MIDI out endpoint
 

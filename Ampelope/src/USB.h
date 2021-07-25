@@ -246,7 +246,7 @@ private:
 	void USB_WritePMA(uint16_t wPMABufAddr, uint16_t wNBytes);
 	void USBD_StdItfReq();
 
-	void USB_ActivateEndpoint(uint8_t endpoint, Direction direction, EndPointType eptype);
+	void USB_ActivateEndpoint(uint8_t endpoint, Direction direction, uint16_t eptype, uint16_t pmaAddress);
 	void USB_ReadPacket(uint32_t* dest, uint16_t len);
 	void USB_WritePacket(const uint8_t* src, uint8_t endpoint, uint16_t len);
 	void USBD_GetDescriptor();
