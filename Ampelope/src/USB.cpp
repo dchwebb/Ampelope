@@ -1,7 +1,7 @@
 #include "USB.h"
 
 bool USBDebug = true;
-
+//USB_PMA_TypeDef* USB_PMAx[7] = reinterpret_cast<USB_PMA_TypeDef*>(USB_PMAADDR);
 
 
 
@@ -357,6 +357,9 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 		USB->EP0R |= (USB_EP_CONTROL | USB_EP_CTR_RX | USB_EP_CTR_TX);
 		//USB->EP0R = ((USB->EP0R ^ USB_EP_RX_VALID) ^ USB_EP_TX_NAK);		// RX and TX status need to be set with XOR
 
+		USB_ActivateEndpoint(0, Direction::out, Control, 0x18);
+		USB_ActivateEndpoint(0, Direction::in, Control, 0x58);
+		/*
 		// Configure the PMA for EP 0
 		USB_PMA->ADDR0_TX = 0x58;						// Offset of PMA used for EP0 TX
 		//USB_PMA->COUNT0_TX = 0x1C;
@@ -368,7 +371,7 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 
 		PCD_CLEAR_TX_DTOG(USB, 0);
 		PCD_SET_EP_TX_STATUS(USB, 0, USB_EP_TX_NAK);
-
+*/
 		USB->DADDR = USB_DADDR_EF;								// Enable endpoint and set address to 0
 
 	}
@@ -637,7 +640,7 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 
 
 
-/*
+
 	/////////// 	2000		ENUMDNE: Enumeration done Interrupt
 	if (USB_ReadInterrupts(USB_OTG_GINTSTS_ENUMDNE)) {
 		// Set the Maximum packet size of the IN EP based on the enumeration speed
@@ -723,24 +726,45 @@ void USBHandler::InitUSB()
 }
 
 
-void USBHandler::USB_ActivateEndpoint(uint8_t endpoint, Direction direction, uint16_t eptype, uint16_t pmaAddress)
+void USBHandler::USB_ActivateEndpoint(uint8_t endpoint, Direction direction, EndPointType eptype, uint16_t pmaAddress)
 {
 	endpoint = endpoint & 0xF;
+	uint16_t ep_type;
+	switch (eptype) {
+	case Control:
+		ep_type = USB_EP_CONTROL;
+		break;
+	case Isochronous:
+		ep_type = USB_EP_ISOCHRONOUS;
+		break;
+	case Bulk:
+		ep_type = USB_EP_BULK;
+		break;
+	case Interrupt:
+		ep_type = USB_EP_INTERRUPT;
+		break;
+	}
 
-	*(volatile uint16_t *)(&(USB)->EP0R + ((endpoint) * 2U)) |= (endpoint | eptype | USB_EP_CTR_RX | USB_EP_CTR_TX);		// Set the address (EA=endpoint) and type (EP_TYPE=eptype)
+	// & USB_EP_T_MASK;
+
+	USB_EPR[endpoint].EPR = (USB_EPR[endpoint].EPR & USB_EP_T_MASK) | (endpoint | ep_type | USB_EP_CTR_RX | USB_EP_CTR_TX);
+	//*(volatile uint16_t *)(&(USB)->EP0R + ((endpoint) * 2U)) |= (endpoint | ep_type | USB_EP_CTR_RX | USB_EP_CTR_TX);		// Set the address (EA=endpoint) and type (EP_TYPE=eptype)
+
+
+
 
 	if (direction == Direction::in) {
 		// Configure the PMA for EP 0
-		USB_PMA->ADDR0_TX = pmaAddress;						// Offset of PMA used for EP0 TX
+		USB_PMA[endpoint].ADDR0_TX = pmaAddress;						// Offset of PMA used for EP0 TX
 
 		PCD_CLEAR_TX_DTOG(USB, endpoint);
 		PCD_SET_EP_TX_STATUS(USB, endpoint, USB_EP_TX_NAK);
 	} else {
-		USB_PMA->ADDR0_RX = pmaAddress;						// Offset of PMA used for EP0 RX
-		USB_PMA->COUNT0_RX = (1 << USB_COUNT0_RX_BLSIZE_Pos) | (1 << USB_COUNT0_RX_NUM_BLOCK_Pos);		// configure block size = 1 (32 Bytes); number of blocks = 2 (64 bytes)
+		USB_PMA[endpoint].ADDR0_RX = pmaAddress;						// Offset of PMA used for EP0 RX
+		USB_PMA[endpoint].COUNT0_RX = (1 << USB_COUNT0_RX_BLSIZE_Pos) | (1 << USB_COUNT0_RX_NUM_BLOCK_Pos);		// configure block size = 1 (32 Bytes); number of blocks = 2 (64 bytes)
 
 		PCD_CLEAR_RX_DTOG(USB, 0);
-		PCD_SET_EP_RX_STATUS(USB, 0, USB_EP_RX_VALID);
+		PCD_SET_EP_RX_STATUS(USB, endpoint, USB_EP_RX_VALID);
 
 	}
 	/*
@@ -957,9 +981,9 @@ void USBHandler::USBD_StdDevReq()
 				HAL_PCDEx_PMAConfig((PCD_HandleTypeDef*)pdev->pData , 0x82 , PCD_SNG_BUF, 0x100);
 				*/
 
-				USB_ActivateEndpoint(CDC_In,   Direction::in,  Bulk, 0xC0);			// Activate CDC in endpoint
-				USB_ActivateEndpoint(CDC_Out,  Direction::out, Bulk, 0x110);			// Activate CDC out endpoint
-				USB_ActivateEndpoint(CDC_Cmd,  Direction::in,  Interrupt, 0x100);		// Activate Command IN EP
+				USB_ActivateEndpoint(CDC_In,  Direction::in,  Bulk,      0xC0);			// Activate CDC in endpoint
+				USB_ActivateEndpoint(CDC_Out, Direction::out, Bulk,      0x110);		// Activate CDC out endpoint
+				USB_ActivateEndpoint(CDC_Cmd, Direction::in,  Interrupt, 0x100);		// Activate Command IN EP
 				//USB_ActivateEndpoint(MIDI_In,  Direction::in,  Bulk);			// Activate MIDI in endpoint
 				//USB_ActivateEndpoint(MIDI_Out, Direction::out, Bulk);			// Activate MIDI out endpoint
 

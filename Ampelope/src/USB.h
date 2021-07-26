@@ -137,15 +137,22 @@ extern bool USBDebug;
 //#define PCD_EP_RX_CNT(bEpNum) ((uint16_t *)((((uint32_t)USB->BTABLE + ((uint32_t)(bEpNum) * 8U) + 6U)) + ((uint32_t)(USB) + 0x400U)))
 
 // Declare registers for PMA area
-typedef struct
-{
-  __IO uint16_t ADDR0_TX;
-  __IO uint16_t COUNT0_TX;
-  __IO uint16_t ADDR0_RX;
-  __IO uint16_t COUNT0_RX;
+typedef struct {
+  volatile uint16_t ADDR0_TX;
+  volatile uint16_t COUNT0_TX;
+  volatile uint16_t ADDR0_RX;
+  volatile uint16_t COUNT0_RX;
 } USB_PMA_TypeDef;
 
+typedef struct {
+	volatile uint16_t EPR;
+	volatile uint16_t reserved;
+} USB_EPR_TypeDef;
+
 #define  USB_PMA  ((USB_PMA_TypeDef*) USB_PMAADDR)
+#define  USB_EPR  ((USB_EPR_TypeDef*)(&USB->EP0R))
+
+//extern USB_PMA_TypeDef* USB_PMAx[7];
 
 // USB Transfer status definitions
 #define STS_GOUT_NAK					1U
@@ -246,7 +253,7 @@ private:
 	void USB_WritePMA(uint16_t wPMABufAddr, uint16_t wNBytes);
 	void USBD_StdItfReq();
 
-	void USB_ActivateEndpoint(uint8_t endpoint, Direction direction, uint16_t eptype, uint16_t pmaAddress);
+	void USB_ActivateEndpoint(uint8_t endpoint, Direction direction, EndPointType eptype, uint16_t pmaAddress);
 	void USB_ReadPacket(uint32_t* dest, uint16_t len);
 	void USB_WritePacket(const uint8_t* src, uint8_t endpoint, uint16_t len);
 	void USBD_GetDescriptor();
