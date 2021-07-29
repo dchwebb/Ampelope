@@ -229,7 +229,7 @@ typedef struct {
 #define USB_CDC_CONFIG_DESC_SIZE		75
 
 #define LOBYTE(x)  (static_cast<uint8_t>(x & 0x00FFU))
-#define HIBYTE(x)  (static_cast<uint8_t>(x & 0xFF00U) >> 8)
+#define HIBYTE(x)  (static_cast<uint8_t>((x & 0xFF00U) >> 8))
 
 class USBHandler {
 public:

@@ -2,6 +2,7 @@
 #include "envelope.h"
 #include "usb.h"
 #include "uartHandler.h"
+#include "SerialHandler.h"
 
 volatile uint32_t SysTickVal;
 volatile uint16_t ADC_array[ADC_BUFFER_LENGTH];
@@ -10,6 +11,7 @@ uint32_t buttonDebounce;
 uint16_t x = 0;
 Envelope envelope;
 USBHandler usb;
+SerialHandler serial(usb);
 
 extern "C" {
 #include "interrupts.h"
@@ -46,6 +48,7 @@ int main(void)
 			//uartSendString("hello");
 
 		}
+		serial.Command();			// Check for incoming CDC commands
 
 	}
 }

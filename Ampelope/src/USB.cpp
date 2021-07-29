@@ -65,37 +65,6 @@ void USBHandler::USB_WritePMA(uint16_t wPMABufAddr, uint16_t wNBytes)
 	}
 }
 
-/*
-	if ((req.mRequest & USB_REQ_TYPE_MASK) == USB_REQ_TYPE_CLASS) {		// 0xA1 & 0x60 == 0x20
-
-		if (req.Length > 0) {
-			if ((req.mRequest & USB_REQ_DIRECTION_MASK) != 0U) {		// Device to host [USBD_CtlSendData]
-				// CDC request 0xA1, 0x21, 0x0, 0x0, 0x7		GetLineCoding 0xA1 0x21 0 Interface 7; Data: Line Coding Data Structure
-				// 0xA1 [1|01|00001] Device to host | Class | Interface
-
-				outBuffSize = req.Length;
-				outBuff = (uint8_t*)&USBD_CDC_LineCoding;
-				ep0_state = USBD_EP0_DATA_IN;
-
-#if (USB_DEBUG)
-				usbDebug[usbDebugNo].PacketSize = outBuffSize;
-				usbDebug[usbDebugNo].xferBuff0 = ((uint32_t*)outBuff)[0];
-				usbDebug[usbDebugNo].xferBuff1 = ((uint32_t*)outBuff)[1];
-#endif
-
-				USB_EPStartXfer(Direction::in, 0, req.Length);		// sends blank request back
-			} else {
-				//CDC request 0x21, 0x20, 0x0, 0x0, 0x7			// USBD_CtlPrepareRx
-				// 0x21 [0|01|00001] Host to device | Class | Interface
-				CmdOpCode = req.Request;
-				USB_EPStartXfer(Direction::out, epnum, req.Length);
-			}
-		} else {
-			// 0x21, 0x22, 0x0, 0x0, 0x0	SetControlLineState 0x21 | 0x22 | 2 | Interface | 0 | None
-			// 0x21, 0x20, 0x0, 0x0, 0x0	SetLineCoding       0x21 | 0x20 | 0 | Interface | 0 | Line Coding Data Structure
-			USB_EPStartXfer(Direction::in, 0, 0);
-		}
- */
 void USBHandler::USBD_StdItfReq() {
 	switch (req.mRequest & USB_REQ_TYPE_MASK)
 	{
@@ -113,6 +82,11 @@ void USBHandler::USBD_StdItfReq() {
 					if ((req.mRequest & USB_REQ_DIRECTION_MASK) != 0U)	{		// Device to host
 						// CDC request 0xA1, 0x21, 0x0, 0x0, 0x7		GetLineCoding 0xA1 0x21 0 Interface 7; Data: Line Coding Data Structure
 						// 0xA1 [1|01|00001] Device to host | Class | Interface
+
+						outBuffSize = req.Length;
+						outBuff = (uint8_t*)&USBD_CDC_LineCoding;
+						ep0_state = USBD_EP0_DATA_IN;
+
 						USB_EPStartXfer(Direction::in, 0, req.Length);
 					} else {
 						//CDC request 0x21, 0x20, 0x0, 0x0, 0x7
@@ -123,6 +97,7 @@ void USBHandler::USBD_StdItfReq() {
 //						hcdc->CmdLength = (uint8_t)req.Length;
 //
 //						(void)USBD_CtlPrepareRx(pdev, (uint8_t *)hcdc->data, req.Length);
+						USB_EPStartXfer(Direction::in, 0, 0);
 					}
 				} else {
 					//((USBD_CDC_ItfTypeDef *)pdev->pUserData)->Control(req.Request, (uint8_t *)req, 0U);
@@ -136,6 +111,7 @@ void USBHandler::USBD_StdItfReq() {
 
 
 			if (req.Length == 0) {
+				int susp = 1;
 				//USBD_CtlSendStatus();
 			}
 
@@ -202,7 +178,7 @@ void USBHandler::USB_EPStartXfer(Direction direction, uint8_t endpoint, uint32_t
 		USB_PMA->COUNT0_TX = len;
 
 		PCD_SET_EP_TX_STATUS(USB, 0, USB_EP_TX_VALID);
-	} else {		// OUT endpoint
+	} else {								// OUT endpoint
 
 		// Multi packet transfer
 		if (xfer_len > ep_maxPacket) {
@@ -245,7 +221,7 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 			wIstr = USB->ISTR;
 			epindex = wIstr & USB_ISTR_EP_ID;		// extract highest priority endpoint number
 
-			if (usbDebugNo == 24) {
+			if (usbDebugNo == 43) {
 				int susp = 1;
 			}
 
@@ -320,8 +296,70 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 					}
 				}
 			} else {
-				int stop = 1;
-				/* Decode and service non control endpoints interrupt */
+				//int stop = 1;
+				// Decode and service non control endpoints interrupt
+				if ((USB_EPR[epindex].EPR & USB_EP_CTR_RX) != 0U) {
+					// clear int flag
+					PCD_CLEAR_RX_EP_CTR(USB, epindex);
+					//ep = &hpcd->OUT_ep[epindex];
+
+					xfer_count = USB_PMA[epindex].COUNT0_RX & USB_COUNT0_RX_COUNT0_RX;
+
+					if (xfer_count != 0U) {
+						USB_ReadPMA(USB_PMA[epindex].ADDR0_RX, xfer_count);			// FIXME get correct PMA address for endpoint
+					}
+
+					// multi-packet on the NON control OUT endpoint
+					//xfer_count += count;
+					//xfer_buff += count;
+
+					uint8_t xfer_len = 0;		// FIXME not sure where this is set
+
+					if ((xfer_len == 0U) || (xfer_count < ep_maxPacket)) {
+						// RX COMPLETE
+						cdcDataHandler((uint8_t*)xfer_buff, xfer_count);
+						//HAL_PCD_DataOutStageCallback(hpcd, ep->num);
+
+						// FIXME: not using correct calculations for number of blocks
+						USB_PMA[epindex].COUNT0_RX |= (1 << USB_COUNT0_RX_NUM_BLOCK_Pos);		// configure block size = 1 (32 Bytes); number of blocks = 2 (64 bytes)
+						PCD_SET_EP_RX_STATUS(USB, epindex, USB_EP_RX_VALID);
+
+					} else {
+						//USB_EPStartXfer(hpcd->Instance, ep);
+					}
+				}
+/*
+				if ((wEPVal & USB_EP_CTR_TX) != 0U) {
+					ep = &hpcd->IN_ep[epindex];
+
+					// clear int flag
+					PCD_CLEAR_TX_EP_CTR(hpcd->Instance, epindex);
+
+					// Manage Bulk Single Buffer Transaction
+					if ((ep->type == EP_TYPE_BULK) && ((wEPVal & USB_EP_KIND) == 0U))
+					{
+						// multi-packet on the NON control IN endpoint
+						TxByteNbre = (uint16_t)PCD_GET_EP_TX_CNT(hpcd->Instance, ep->num);
+
+						if (ep->xfer_len > TxByteNbre) {
+							ep->xfer_len -= TxByteNbre;
+						} else {
+							ep->xfer_len = 0U;
+						}
+
+						// Zero Length Packet?
+						if (ep->xfer_len == 0U) {
+							// TX COMPLETE
+							HAL_PCD_DataInStageCallback(hpcd, ep->num);
+						} else {
+							// Transfer is not yet Done
+							ep->xfer_buff += TxByteNbre;
+							ep->xfer_count += TxByteNbre;
+							(void)USB_EPStartXfer(hpcd->Instance, ep);
+						}
+					}
+				}
+*/
 			}
 			//USB->ISTR &= ~USB_ISTR_CTR;
 		}
@@ -353,25 +391,9 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 	if (USB_ReadInterrupts(USB_ISTR_RESET))	{
 		USB->ISTR &= ~USB_ISTR_RESET;
 
-		// FIXME - use USB_ActivateEndpoint
-		USB->EP0R |= (USB_EP_CONTROL | USB_EP_CTR_RX | USB_EP_CTR_TX);
-		//USB->EP0R = ((USB->EP0R ^ USB_EP_RX_VALID) ^ USB_EP_TX_NAK);		// RX and TX status need to be set with XOR
-
 		USB_ActivateEndpoint(0, Direction::out, Control, 0x18);
 		USB_ActivateEndpoint(0, Direction::in, Control, 0x58);
-		/*
-		// Configure the PMA for EP 0
-		USB_PMA->ADDR0_TX = 0x58;						// Offset of PMA used for EP0 TX
-		//USB_PMA->COUNT0_TX = 0x1C;
-		USB_PMA->ADDR0_RX = 0x18;						// Offset of PMA used for EP0 RX
-		USB_PMA->COUNT0_RX = (1 << USB_COUNT0_RX_BLSIZE_Pos) | (1 << USB_COUNT0_RX_NUM_BLOCK_Pos);		// configure block size = 1 (32 Bytes); number of blocks = 2 (64 bytes)
 
-		PCD_CLEAR_RX_DTOG(USB, 0);
-		PCD_SET_EP_RX_STATUS(USB, 0, USB_EP_RX_VALID);
-
-		PCD_CLEAR_TX_DTOG(USB, 0);
-		PCD_SET_EP_TX_STATUS(USB, 0, USB_EP_TX_NAK);
-*/
 		USB->DADDR = USB_DADDR_EF;								// Enable endpoint and set address to 0
 
 	}
@@ -696,33 +718,18 @@ void USBHandler::InitUSB()
 
 	RCC->CRRCR |= RCC_CRRCR_HSI48ON;					// Enable Internal High Speed oscillator for USB
 	while ((RCC->CRRCR & RCC_CRRCR_HSI48RDY) == 0);		// Wait till internal USB oscillator is ready
-	//RCC->D2CCIP2R |= RCC_D2CCIP2R_USBSEL;				// Set the USB CLock MUX to RC48
 	RCC->APB1ENR1 |= RCC_APB1ENR1_USBEN;				// USB2OTG (OTG_HS2) Peripheral Clocks Enable
-	//PWR->CR3 |= PWR_CR3_USB33DEN;						// Enable VDD33USB supply level detector
 
 	NVIC_SetPriority(USB_LP_IRQn, 3);
 	NVIC_EnableIRQ(USB_LP_IRQn);
 
-	/* Set winterruptmask variable */
-	uint32_t winterruptmask = USB_CNTR_CTRM  | USB_CNTR_WKUPM |
-			USB_CNTR_SUSPM | USB_CNTR_ERRM |
-			USB_CNTR_RESETM | USB_CNTR_L1REQM;			// USB_CNTR_SOFM | USB_CNTR_ESOFM |
+	uint16_t winterruptmask = USB_CNTR_CTRM  | USB_CNTR_WKUPM | USB_CNTR_SUSPM | USB_CNTR_ERRM | USB_CNTR_RESETM | USB_CNTR_L1REQM;
 
-	/* Clear interrupt mask */
-	USB->CNTR &= (uint16_t)(~winterruptmask);
-
-	USB->CNTR = (uint16_t)USB_CNTR_FRES;				//  Force USB Reset
-	USB->CNTR = 0U;
-	USB->ISTR = 0U;										// Clear pending interrupts
+	USB->CNTR = USB_CNTR_FRES;							// Force USB Reset
 	USB->BTABLE = 0;									// Set Buffer table Address BTABLE_ADDRESS
-
-	/* Clear pending interrupts */
-	USB->ISTR = 0U;
-	USB->CNTR = (uint16_t)(winterruptmask);
-
-	/* Enabling DP Pull-UP bit to Connect internal PU resistor on USB DP line */
-	USB->BCDR |= (uint16_t)USB_BCDR_DPPU;
-
+	USB->ISTR = 0;										// Clear pending interrupts
+	USB->CNTR = winterruptmask;
+	USB->BCDR |= (uint16_t)USB_BCDR_DPPU;				// Connect internal PU resistor on USB DP line
 }
 
 
@@ -731,30 +738,16 @@ void USBHandler::USB_ActivateEndpoint(uint8_t endpoint, Direction direction, End
 	endpoint = endpoint & 0xF;
 	uint16_t ep_type;
 	switch (eptype) {
-	case Control:
-		ep_type = USB_EP_CONTROL;
-		break;
-	case Isochronous:
-		ep_type = USB_EP_ISOCHRONOUS;
-		break;
-	case Bulk:
-		ep_type = USB_EP_BULK;
-		break;
-	case Interrupt:
-		ep_type = USB_EP_INTERRUPT;
-		break;
+	case Control:		ep_type = USB_EP_CONTROL;		break;
+	case Isochronous:	ep_type = USB_EP_ISOCHRONOUS;	break;
+	case Bulk:			ep_type = USB_EP_BULK;			break;
+	case Interrupt:		ep_type = USB_EP_INTERRUPT;		break;
 	}
 
-	// & USB_EP_T_MASK;
-
+	// Set the address (EA=endpoint) and type (EP_TYPE=ep_type)
 	USB_EPR[endpoint].EPR = (USB_EPR[endpoint].EPR & USB_EP_T_MASK) | (endpoint | ep_type | USB_EP_CTR_RX | USB_EP_CTR_TX);
-	//*(volatile uint16_t *)(&(USB)->EP0R + ((endpoint) * 2U)) |= (endpoint | ep_type | USB_EP_CTR_RX | USB_EP_CTR_TX);		// Set the address (EA=endpoint) and type (EP_TYPE=eptype)
-
-
-
 
 	if (direction == Direction::in) {
-		// Configure the PMA for EP 0
 		USB_PMA[endpoint].ADDR0_TX = pmaAddress;						// Offset of PMA used for EP0 TX
 
 		PCD_CLEAR_TX_DTOG(USB, endpoint);
@@ -765,27 +758,8 @@ void USBHandler::USB_ActivateEndpoint(uint8_t endpoint, Direction direction, End
 
 		PCD_CLEAR_RX_DTOG(USB, 0);
 		PCD_SET_EP_RX_STATUS(USB, endpoint, USB_EP_RX_VALID);
-
 	}
-	/*
-	if (direction == Direction::in) {
-		USBx_DEVICE->DAINTMSK |= USB_OTG_DAINTMSK_IEPM & static_cast<uint32_t>(1UL << (endpoint & EP_ADDR_MASK));
 
-		if ((USBx_INEP(endpoint)->DIEPCTL & USB_OTG_DIEPCTL_USBAEP) == 0U) {
-			USBx_INEP(endpoint)->DIEPCTL |= (ep_maxPacket & USB_OTG_DIEPCTL_MPSIZ) |
-					(static_cast<uint32_t>(eptype) << 18) | (endpoint << 22) |
-					USB_OTG_DIEPCTL_USBAEP;
-		}
-	} else {
-		USBx_DEVICE->DAINTMSK |= USB_OTG_DAINTMSK_OEPM & (static_cast<uint32_t>(1UL << (endpoint & EP_ADDR_MASK)) << 16);
-
-		if (((USBx_OUTEP(endpoint)->DOEPCTL) & USB_OTG_DOEPCTL_USBAEP) == 0U) {
-			USBx_OUTEP(endpoint)->DOEPCTL |= (ep_maxPacket & USB_OTG_DOEPCTL_MPSIZ) |
-					static_cast<uint32_t>(eptype << 18) |
-					USB_OTG_DOEPCTL_USBAEP;
-		}
-	}
-*/
 }
 
 // USB_ReadPacket : read a packet from the RX FIFO
@@ -1094,7 +1068,7 @@ void USBHandler::OutputDebug() {
 
 					case USB_DESC_TYPE_STRING:
 
-						switch ((uint8_t)(req.Value)) {
+						switch ((uint8_t)(usbDebug[evNo].Request.Value & 0xFF)) {
 						case USBD_IDX_LANGID_STR:			// 300
 							subtype = "Get Lang Str Descriptor";
 							break;
@@ -1109,9 +1083,9 @@ void USBHandler::OutputDebug() {
 							break;
 					    case USBD_IDX_CDC_STR:				// 304
 							subtype = "Get CDC Str Descriptor";
-					      break;
+							break;
 						}
-
+						break;
 					default:
 						subtype = "Get Descriptor";
 					}
@@ -1124,6 +1098,7 @@ void USBHandler::OutputDebug() {
 				}
 			} else {
 				interrupt = "CTR_IN";
+				subtype = "";
 			}
 		}
 
