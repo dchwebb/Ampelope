@@ -254,8 +254,6 @@ private:
 	void USBD_StdItfReq();
 
 	void USB_ActivateEndpoint(uint8_t endpoint, Direction direction, EndPointType eptype, uint16_t pmaAddress);
-	void USB_ReadPacket(uint32_t* dest, uint16_t len);
-	void USB_WritePacket(const uint8_t* src, uint8_t endpoint, uint16_t len);
 	void USBD_GetDescriptor();
 	void USBD_StdDevReq();
 	void USB_EPStartXfer(Direction direction, uint8_t endpoint, uint32_t xfer_len);
