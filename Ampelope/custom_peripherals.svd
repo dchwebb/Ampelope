@@ -272,7 +272,7 @@
                <displayName>EP0_BUFFER</displayName>
                <description>USB endpoint n register</description>
                <addressOffset>0x18</addressOffset>
-               <size>0x20</size>
+               <size>0x10</size>
                <access>read-write</access>
                <resetValue>0x00000000</resetValue>
                <fields>
@@ -280,7 +280,24 @@
                      <name>BUFF0</name>
                      <description>BUFF0</description>
                      <bitOffset>0</bitOffset>
-                     <bitWidth>32</bitWidth>
+                     <bitWidth>16</bitWidth>
+                  </field>
+               </fields>
+            </register>
+				<register>
+               <name>EP0_RX_BUFFER2</name>
+               <displayName>EP0_BUFFER</displayName>
+               <description>USB endpoint n register</description>
+               <addressOffset>0x1A</addressOffset>
+               <size>0x10</size>
+               <access>read-write</access>
+               <resetValue>0x00000000</resetValue>
+               <fields>
+                  <field>
+                     <name>BUFF0</name>
+                     <description>BUFF0</description>
+                     <bitOffset>0</bitOffset>
+                     <bitWidth>16</bitWidth>
                   </field>
                </fields>
             </register>

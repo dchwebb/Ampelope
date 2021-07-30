@@ -27,7 +27,7 @@ void USBHandler::USB_ReadPMA(uint16_t wPMABufAddr, uint16_t wNBytes)
 	volatile uint16_t *pdwVal;
 	uint8_t *pBuf = (uint8_t *)(&xfer_buff);
 
-	pdwVal = (volatile uint16_t *)((uint32_t)(USB_PMAADDR) + ((uint32_t)wPMABufAddr));		// 0x40006018
+	//pdwVal = (volatile uint16_t *)((uint32_t)(USB_PMAADDR) + ((uint32_t)wPMABufAddr));		// 0x40006018
 	pdwVal = (volatile uint16_t *)(USB_PMAADDR + wPMABufAddr);		// 0x40006018
 
 	for (i = n; i != 0; i--) {
@@ -89,6 +89,7 @@ void USBHandler::USBD_StdItfReq() {
 
 						USB_EPStartXfer(Direction::in, 0, req.Length);
 					} else {
+
 						//CDC request 0x21, 0x20, 0x0, 0x0, 0x7
 						// 0x21 [0|01|00001] Host to device | Class | Interface
 						CmdOpCode = req.Request;
@@ -97,12 +98,15 @@ void USBHandler::USBD_StdItfReq() {
 //						hcdc->CmdLength = (uint8_t)req.Length;
 //
 //						(void)USBD_CtlPrepareRx(pdev, (uint8_t *)hcdc->data, req.Length);
-						USB_EPStartXfer(Direction::in, 0, 0);
+//						USB_EPStartXfer(Direction::in, 0, 0);
+
+
 					}
 				} else {
 					//((USBD_CDC_ItfTypeDef *)pdev->pUserData)->Control(req.Request, (uint8_t *)req, 0U);
 					// 0x21, 0x22, 0x0, 0x0, 0x0	SetControlLineState 0x21 | 0x22 | 2 | Interface | 0 | None
 					// 0x21, 0x20, 0x0, 0x0, 0x0	SetLineCoding       0x21 | 0x20 | 0 | Interface | 0 | Line Coding Data Structure
+
 					USB_EPStartXfer(Direction::in, 0, 0);
 
 				}
@@ -278,6 +282,18 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 
 						if ((xfer_count != 0U) && (xfer_buff != 0U)) {
 							USB_ReadPMA(0x18, xfer_count);
+
+					        // In CDC mode after 0x21 0x20 packets (line coding commands)
+							if (dev_state == USBD_STATE_CONFIGURED && CmdOpCode != 0) {
+								if (CmdOpCode == 0x20) {			// SET_LINE_CODING - capture the data passed to return when queried with GET_LINE_CODING
+									USBD_CDC_LineCoding = *(USBD_CDC_LineCodingTypeDef*)xfer_buff;
+//									for (uint8_t i = 0; i < outBuffSize; ++i) {
+//										((uint8_t*)&USBD_CDC_LineCoding)[i] = ((uint8_t*)xfer_buff)[i];
+//									}
+								}
+								USB_EPStartXfer(Direction::in, 0, 0);
+								CmdOpCode = 0;
+							}
 
 							//xfer_buff += xfer_count;
 
@@ -661,53 +677,6 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 		}
 
 
-
-
-	/////////// 	2000		ENUMDNE: Enumeration done Interrupt
-	if (USB_ReadInterrupts(USB_OTG_GINTSTS_ENUMDNE)) {
-		// Set the Maximum packet size of the IN EP based on the enumeration speed
-		USBx_INEP(0U)->DIEPCTL &= ~USB_OTG_DIEPCTL_MPSIZ;
-		USBx_DEVICE->DCTL |= USB_OTG_DCTL_CGINAK;		//  Clear global IN NAK
-
-		// Assuming Full Speed USB and clock > 32MHz Set USB Turnaround time
-		USB->GUSBCFG &= ~USB_OTG_GUSBCFG_TRDT;
-		USB->GUSBCFG |= (6 << 10);
-
-		USB_ActivateEndpoint(0, Direction::out, Control);			// Open EP0 OUT
-		USB_ActivateEndpoint(0, Direction::in, Control);			// Open EP0 IN
-
-		ep0_state = USBD_EP0_IDLE;
-
-		USB->ISTR &= USB_OTG_GINTSTS_ENUMDNE;
-	}
-
-
-	///////////		40000000	SRQINT: Connection event Interrupt
-	if (USB_ReadInterrupts(USB_OTG_GINTSTS_SRQINT))	{
-		//HAL_PCD_ConnectCallback(hpcd);		// this doesn't seem to do anything
-		USB->ISTR &= USB_OTG_GINTSTS_SRQINT;
-	}
-
-
-	/////////// 	80000000	WKUINT: Resume Interrupt
-	if (USB_ReadInterrupts(USB_OTG_GINTSTS_WKUINT)) {
-		// Clear the Remote Wake-up Signaling
-		USBx_DEVICE->DCTL &= ~USB_OTG_DCTL_RWUSIG;
-		USB->ISTR &= USB_OTG_GINTSTS_WKUINT;
-	}
-
-
-	/////////// OTGINT: Handle Disconnection event Interrupt
-	if (USB_ReadInterrupts(USB_OTG_GINTSTS_OTGINT)) {
-		uint32_t temp = USB->GOTGINT;
-
-		if ((temp & USB_OTG_GOTGINT_SEDET) == USB_OTG_GOTGINT_SEDET)
-		{
-			//HAL_PCD_DisconnectCallback(hpcd);
-			//pdev->pClass->DeInit(pdev, (uint8_t)pdev->dev_config);
-		}
-		USB->GOTGINT |= temp;
-	}
 */
 }
 
@@ -1093,8 +1062,20 @@ void USBHandler::OutputDebug() {
 					subtype = "Set Address to " + std::to_string(usbDebug[evNo].Request.Value);
 				} else if (usbDebug[evNo].Request.Request == 9) {
 					subtype = "SET_CONFIGURATION";
+				} else if ((usbDebug[evNo].Request.mRequest & USB_REQ_TYPE_MASK) == USB_REQ_TYPE_CLASS) {
+					switch (usbDebug[evNo].Request.Request) {
+					case 0x20:
+						subtype = "CDC: Set Line Coding";
+						break;
+					case 0x21:
+						subtype = "CDC: Get Line Coding";
+						break;
+					case 0x22:
+						subtype = "CDC: Set Control Line State";
+						break;
+					}
 				} else {
-					subtype = "Setup phase done";
+					subtype = "";
 				}
 			} else {
 				interrupt = "CTR_IN";
