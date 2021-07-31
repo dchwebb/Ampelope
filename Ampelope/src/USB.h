@@ -247,8 +247,8 @@ public:
 	volatile bool transmitting;
 
 private:
-	void USBD_ParseSetupRequest();
-	void USBD_LL_SetupStage();
+	//void USBD_ParseSetupRequest();
+	void ProcessSetupPacket();
 	void USB_ReadPMA(uint16_t wPMABufAddr, uint16_t wNBytes);
 	void USB_WritePMA(uint16_t wPMABufAddr, uint16_t wNBytes);
 	void USBD_StdItfReq();
