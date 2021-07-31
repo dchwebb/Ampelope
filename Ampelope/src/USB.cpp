@@ -169,6 +169,7 @@ void USBHandler::USBD_LL_SetupStage()
 void USBHandler::USB_EPStartXfer(Direction direction, uint8_t endpoint, uint32_t xfer_len)
 {
 	uint32_t len;
+	uint8_t ep_index = (endpoint & 0xF);
 
 	if (direction == Direction::in) {		// IN endpoint
 		// Multi packet transfer
@@ -178,10 +179,11 @@ void USBHandler::USB_EPStartXfer(Direction direction, uint8_t endpoint, uint32_t
 			len = xfer_len;
 		}
 
-		USB_WritePMA(0x58, len);
-		USB_PMA->COUNT0_TX = len;
+		//USB_WritePMA(0x58, len);
+		USB_WritePMA(USB_PMA[ep_index].ADDR0_TX, len);
+		USB_PMA[ep_index].COUNT0_TX = len;
 
-		PCD_SET_EP_TX_STATUS(USB, 0, USB_EP_TX_VALID);
+		PCD_SET_EP_TX_STATUS(USB, ep_index, USB_EP_TX_VALID);
 	} else {								// OUT endpoint
 
 		// Multi packet transfer
@@ -335,38 +337,38 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 						//USB_EPStartXfer(hpcd->Instance, ep);
 					}
 				}
-/*
-				if ((wEPVal & USB_EP_CTR_TX) != 0U) {
-					ep = &hpcd->IN_ep[epindex];
+
+				if ((USB_EPR[epindex].EPR & USB_EP_CTR_TX) != 0U) {
+					//ep = &hpcd->IN_ep[epindex];
 
 					// clear int flag
-					PCD_CLEAR_TX_EP_CTR(hpcd->Instance, epindex);
+					PCD_CLEAR_TX_EP_CTR(USB, epindex);
 
 					// Manage Bulk Single Buffer Transaction
-					if ((ep->type == EP_TYPE_BULK) && ((wEPVal & USB_EP_KIND) == 0U))
-					{
+					//if ((ep->type == EP_TYPE_BULK) && ((wEPVal & USB_EP_KIND) == 0U)) {
 						// multi-packet on the NON control IN endpoint
-						TxByteNbre = (uint16_t)PCD_GET_EP_TX_CNT(hpcd->Instance, ep->num);
-
-						if (ep->xfer_len > TxByteNbre) {
-							ep->xfer_len -= TxByteNbre;
-						} else {
-							ep->xfer_len = 0U;
-						}
-
-						// Zero Length Packet?
-						if (ep->xfer_len == 0U) {
-							// TX COMPLETE
-							HAL_PCD_DataInStageCallback(hpcd, ep->num);
-						} else {
-							// Transfer is not yet Done
-							ep->xfer_buff += TxByteNbre;
-							ep->xfer_count += TxByteNbre;
-							(void)USB_EPStartXfer(hpcd->Instance, ep);
-						}
+					//uint16_t TxByteNbre = (uint16_t)PCD_GET_EP_TX_CNT(hpcd->Instance, ep->num);
+					uint16_t TxByteNbre = USB_PMA[epindex].COUNT0_TX & USB_COUNT0_TX_COUNT0_TX;
+/*
+					if (xfer_len > TxByteNbre) {
+						xfer_len -= TxByteNbre;
+					} else {
+						xfer_len = 0U;
 					}
+
+					// Zero Length Packet?
+					if (xfer_len == 0U) {
+						// TX COMPLETE
+						HAL_PCD_DataInStageCallback(hpcd, ep->num);
+					} else {
+						// Transfer is not yet Done
+						ep->xfer_buff += TxByteNbre;
+						ep->xfer_count += TxByteNbre;
+						(void)USB_EPStartXfer(hpcd->Instance, ep);
+					}
+					*/
 				}
-*/
+
 			}
 			//USB->ISTR &= ~USB_ISTR_CTR;
 		}
@@ -927,6 +929,7 @@ bool USBHandler::USB_ReadInterrupts(uint32_t interrupt) {
 
 	return (USB->ISTR & interrupt) == interrupt;
 }
+
 
 void USBHandler::SendData(const uint8_t* data, uint16_t len, uint8_t endpoint) {
 	if (dev_state == USBD_STATE_CONFIGURED) {
