@@ -305,17 +305,15 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 					}
 				}
 			} else {
-				//int stop = 1;
-				// Decode and service non control endpoints interrupt
+
 				if ((USB_EPR[epindex].EPR & USB_EP_CTR_RX) != 0U) {
-					// clear int flag
-					PCD_CLEAR_RX_EP_CTR(USB, epindex);
-					//ep = &hpcd->OUT_ep[epindex];
+
+					PCD_CLEAR_RX_EP_CTR(USB, epindex);									// clear interrupt flag
 
 					xfer_count = USB_PMA[epindex].COUNT0_RX & USB_COUNT0_RX_COUNT0_RX;
 
 					if (xfer_count != 0U) {
-						USB_ReadPMA(USB_PMA[epindex].ADDR0_RX, xfer_count);			// FIXME get correct PMA address for endpoint
+						USB_ReadPMA(USB_PMA[epindex].ADDR0_RX, xfer_count);
 					}
 
 					// multi-packet on the NON control OUT endpoint
@@ -340,7 +338,7 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 
 				if ((USB_EPR[epindex].EPR & USB_EP_CTR_TX) != 0U) {
 					//ep = &hpcd->IN_ep[epindex];
-
+					transmitting = false;
 					// clear int flag
 					PCD_CLEAR_TX_EP_CTR(USB, epindex);
 
@@ -349,12 +347,23 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 						// multi-packet on the NON control IN endpoint
 					//uint16_t TxByteNbre = (uint16_t)PCD_GET_EP_TX_CNT(hpcd->Instance, ep->num);
 					uint16_t TxByteNbre = USB_PMA[epindex].COUNT0_TX & USB_COUNT0_TX_COUNT0_TX;
-/*
-					if (xfer_len > TxByteNbre) {
-						xfer_len -= TxByteNbre;
+
+					transmitting = false;
+
+					if (outBuffSize > TxByteNbre) {
+						outBuffSize -= TxByteNbre;
+						// Transfer is not yet Done
+						outBuff += TxByteNbre;
+						//ep->xfer_count += TxByteNbre;
+						//USB_EPStartXfer(hpcd->Instance, ep);
+						USB_EPStartXfer(Direction::in, epindex, outBuffSize);
 					} else {
-						xfer_len = 0U;
+						outBuffSize = 0;
+						// TX COMPLETE
+						//HAL_PCD_DataInStageCallback(hpcd, ep->num);
 					}
+
+	/*
 
 					// Zero Length Packet?
 					if (xfer_len == 0U) {
