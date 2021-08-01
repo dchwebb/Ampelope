@@ -2,6 +2,65 @@
 
 bool USBDebug = true;
 
+void PCD_CLEAR_RX_EP_CTR(uint8_t bEpNum)
+{
+	uint16_t _wRegVal = USB_EPR[bEpNum].EPR & (0x7FFFU & USB_EPREG_MASK);
+	USB_EPR[bEpNum].EPR = _wRegVal | USB_EP_CTR_TX;
+}
+
+void PCD_CLEAR_TX_EP_CTR(uint8_t bEpNum)
+{
+	uint16_t _wRegVal = USB_EPR[bEpNum].EPR & (0xFF7FU & USB_EPREG_MASK);
+	USB_EPR[bEpNum].EPR = _wRegVal | USB_EP_CTR_RX;
+}
+
+void PCD_CLEAR_RX_DTOG(uint8_t bEpNum)
+{
+	if ((USB_EPR[bEpNum].EPR & USB_EP_DTOG_RX) != 0) {
+		uint16_t _wEPVal = USB_EPR[bEpNum].EPR & USB_EPREG_MASK;
+		USB_EPR[bEpNum].EPR = _wEPVal | USB_EP_CTR_RX | USB_EP_CTR_TX | USB_EP_DTOG_RX;
+	}
+}
+
+void PCD_CLEAR_TX_DTOG(uint8_t bEpNum)
+{
+	if ((USB_EPR[bEpNum].EPR & USB_EP_DTOG_TX) != 0) {
+		uint16_t _wEPVal = USB_EPR[bEpNum].EPR & USB_EPREG_MASK;
+		USB_EPR[bEpNum].EPR = _wEPVal | USB_EP_CTR_RX | USB_EP_CTR_TX | USB_EP_DTOG_TX;
+	}
+}
+
+
+void PCD_SET_EP_TX_STATUS(uint8_t bEpNum, uint16_t wState)
+{
+	uint16_t _wRegVal = USB_EPR[bEpNum].EPR & USB_EPTX_DTOGMASK;
+	// toggle first bit ?
+	if ((USB_EPTX_DTOG1 & wState)!= 0) {
+		_wRegVal ^= USB_EPTX_DTOG1;
+	}
+	// toggle second bit ?
+	if ((USB_EPTX_DTOG2 & wState)!= 0) {
+		_wRegVal ^= USB_EPTX_DTOG2;
+	}
+	USB_EPR[bEpNum].EPR = _wRegVal | USB_EP_CTR_RX | USB_EP_CTR_TX;
+}
+
+
+void PCD_SET_EP_RX_STATUS(uint8_t bEpNum, uint16_t wState)
+{
+	uint16_t _wRegVal = USB_EPR[bEpNum].EPR & USB_EPRX_DTOGMASK;
+	// toggle first bit ?
+	if ((USB_EPRX_DTOG1 & wState) != 0) {
+		_wRegVal ^= USB_EPRX_DTOG1;
+	}
+	// toggle second bit ?
+	if ((USB_EPRX_DTOG2 & wState) != 0) {
+		_wRegVal ^= USB_EPRX_DTOG2;
+	}
+	USB_EPR[bEpNum].EPR = _wRegVal | USB_EP_CTR_RX | USB_EP_CTR_TX;
+}
+
+
 void USBHandler::USB_ReadPMA(uint16_t wPMABufAddr, uint16_t wNBytes)
 {
 	uint32_t n = (uint32_t)wNBytes >> 1;
@@ -135,7 +194,7 @@ void USBHandler::USB_EPStartXfer(Direction direction, uint8_t endpoint, uint32_t
 		USB_WritePMA(USB_PMA[ep_index].ADDR0_TX, len);
 		USB_PMA[ep_index].COUNT0_TX = len;
 
-		PCD_SET_EP_TX_STATUS(USB, ep_index, USB_EP_TX_VALID);
+		PCD_SET_EP_TX_STATUS(ep_index, USB_EP_TX_VALID);
 	} else {								// OUT endpoint
 /*
 		// Multi packet transfer
@@ -156,7 +215,7 @@ void USBHandler::USB_EPStartXfer(Direction direction, uint8_t endpoint, uint32_t
 //			USB_PMA->COUNT0_RX |= (1 << USB_COUNT0_RX_NUM_BLOCK_Pos);		// configure block size = 1 (32 Bytes); number of blocks = 2 (64 bytes)
 		}
 */
-		PCD_SET_EP_RX_STATUS(USB, 0, USB_EP_RX_VALID);
+		PCD_SET_EP_RX_STATUS(0, USB_EP_RX_VALID);
 	}
 }
 
@@ -184,9 +243,9 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 
 		if (epindex == 0) {
 			if ((wIstr & USB_ISTR_DIR) == 0) {			// DIR = 0: Direction IN
-				PCD_CLEAR_TX_EP_CTR(USB, 0);
+				PCD_CLEAR_TX_EP_CTR(0);
 
-				//PCD_SET_EP_TX_STATUS(USB, 0, USB_EP_TX_VALID);
+				//PCD_SET_EP_TX_STATUS(0, USB_EP_TX_VALID);
 				xfer_count = USB_PMA->COUNT0_TX & USB_COUNT0_TX_COUNT0_TX_Msk;
 				//xfer_buff += xfer_count;
 				outBuff += xfer_count;
@@ -198,7 +257,7 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 						USB_EPStartXfer(Direction::out, 0, 0);
 					} else {
 						// FIXME if (rem_length ==  maxpacket) etc - where non zero size packet and last packet is a multiple of max packet size
-						PCD_SET_EP_TX_STATUS(USB, 0, USB_EP_TX_STALL);
+						PCD_SET_EP_TX_STATUS(0, USB_EP_TX_STALL);
 						USB_EPStartXfer(Direction::out, 0, 0);
 					}
 				}
@@ -214,12 +273,12 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 					xfer_count = USB_PMA->COUNT0_RX & USB_COUNT0_RX_COUNT0_RX_Msk;
 					USB_ReadPMA(0x18, xfer_count);		// Read setup data into xfer_buff
 
-					PCD_CLEAR_RX_EP_CTR(USB, 0);		// clears 8000 interrupt
+					PCD_CLEAR_RX_EP_CTR(0);				// clears 8000 interrupt
 
 					ProcessSetupPacket();				// Parse setup packet into request, locate data (eg descriptor) and populate TX buffer
 
 				} else if ((USB->EP0R & USB_EP_CTR_RX) != 0) {
-					PCD_CLEAR_RX_EP_CTR(USB, 0);
+					PCD_CLEAR_RX_EP_CTR(0);
 
 					xfer_count = USB_PMA->COUNT0_RX & USB_COUNT0_RX_COUNT0_RX;
 					// Get Control Data OUT Packet
@@ -246,7 +305,7 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 						//PCD_SET_EP_RX_CNT(hpcd->Instance, PCD_ENDP0, ep->maxpacket);
 
 						//							USB_PMA->COUNT0_RX |= (1 << USB_COUNT0_RX_NUM_BLOCK_Pos);		// configure block size = 1 (32 Bytes); number of blocks = 2 (64 bytes)
-						PCD_SET_EP_RX_STATUS(USB, 0, USB_EP_RX_VALID);
+						PCD_SET_EP_RX_STATUS(0, USB_EP_RX_VALID);
 					}
 
 				}
@@ -255,7 +314,7 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 
 			if ((USB_EPR[epindex].EPR & USB_EP_CTR_RX) != 0) {
 
-				PCD_CLEAR_RX_EP_CTR(USB, epindex);									// clear interrupt flag
+				PCD_CLEAR_RX_EP_CTR(epindex);									// clear interrupt flag
 
 				xfer_count = USB_PMA[epindex].COUNT0_RX & USB_COUNT0_RX_COUNT0_RX;
 
@@ -263,30 +322,22 @@ void USBHandler::USBInterruptHandler() {		// In Drivers\STM32F4xx_HAL_Driver\Src
 					USB_ReadPMA(USB_PMA[epindex].ADDR0_RX, xfer_count);
 				}
 
-				// multi-packet on the NON control OUT endpoint
-				//xfer_count += count;
-				//xfer_buff += count;
-
-				uint8_t xfer_len = 0;		// FIXME not sure where this is set
-
-				if ((xfer_len == 0) || (xfer_count < ep_maxPacket)) {							// RX COMPLETE
+				//if (xfer_count < ep_maxPacket) {							// RX COMPLETE
 					cdcDataHandler((uint8_t*)xfer_buff, xfer_count);
-					PCD_SET_EP_RX_STATUS(USB, epindex, USB_EP_RX_VALID);
+					PCD_SET_EP_RX_STATUS(epindex, USB_EP_RX_VALID);
 
-				} else {
-					//USB_EPStartXfer(hpcd->Instance, ep);
-				}
+//				} else {
+//					int susp = 1;
+//					PCD_SET_EP_RX_STATUS(epindex, USB_EP_RX_VALID);
+//					//USB_EPStartXfer(hpcd->Instance, ep);
+//				}
 			}
 
 			if ((USB_EPR[epindex].EPR & USB_EP_CTR_TX) != 0) {
-				//ep = &hpcd->IN_ep[epindex];
 				transmitting = false;
-				// clear int flag
-				PCD_CLEAR_TX_EP_CTR(USB, epindex);
+				PCD_CLEAR_TX_EP_CTR(epindex);
 
 				uint16_t TxByteNbre = USB_PMA[epindex].COUNT0_TX & USB_COUNT0_TX_COUNT0_TX;
-
-				transmitting = false;
 
 				if (outBuffSize > TxByteNbre) {
 					outBuffSize -= TxByteNbre;
@@ -383,14 +434,14 @@ void USBHandler::USB_ActivateEndpoint(uint8_t endpoint, Direction direction, End
 	if (direction == Direction::in) {
 		USB_PMA[endpoint].ADDR0_TX = pmaAddress;						// Offset of PMA used for EP0 TX
 
-		PCD_CLEAR_TX_DTOG(USB, endpoint);
-		PCD_SET_EP_TX_STATUS(USB, endpoint, USB_EP_TX_NAK);
+		PCD_CLEAR_TX_DTOG(endpoint);
+		PCD_SET_EP_TX_STATUS(endpoint, USB_EP_TX_NAK);
 	} else {
 		USB_PMA[endpoint].ADDR0_RX = pmaAddress;						// Offset of PMA used for EP0 RX
 		USB_PMA[endpoint].COUNT0_RX = (1 << USB_COUNT0_RX_BLSIZE_Pos) | (1 << USB_COUNT0_RX_NUM_BLOCK_Pos);		// configure block size = 1 (32 Bytes); number of blocks = 2 (64 bytes)
 
-		PCD_CLEAR_RX_DTOG(USB, 0);
-		PCD_SET_EP_RX_STATUS(USB, endpoint, USB_EP_RX_VALID);
+		PCD_CLEAR_RX_DTOG(endpoint);
+		PCD_SET_EP_RX_STATUS(endpoint, USB_EP_RX_VALID);
 	}
 
 }
@@ -518,8 +569,8 @@ void USBHandler::IntToUnicode(uint32_t value, uint8_t* pbuf, uint8_t len) {
 
 
 void USBHandler::USBD_CtlError() {
-	PCD_SET_EP_TX_STATUS(USB, 0, USB_EP_TX_STALL);
-	//PCD_SET_EP_RX_STATUS(USB, 0, USB_EP_TX_STALL);
+	PCD_SET_EP_TX_STATUS(0, USB_EP_TX_STALL);
+	//PCD_SET_EP_RX_STATUS(0, USB_EP_TX_STALL);
 }
 
 
