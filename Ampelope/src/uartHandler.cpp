@@ -46,8 +46,16 @@ std::string IntToString(const int32_t& v) {
 }
 
 std::string HexToString(const uint32_t& v, const bool& spaces) {
-	char buf[50];
-	sprintf(buf, "%X", v);
+	char buf[20];
+	if (spaces) {
+		if (v != 0) {
+			sprintf(buf, "%02X %02X %02X %02X", v & 0xFF, (v >> 8) & 0xFF, (v >> 16) & 0xFF, (v >> 24) & 0xFF);
+		} else {
+			sprintf(buf, "");
+		}
+	} else {
+		sprintf(buf, "%X", v);
+	}
 	return std::string(buf);
 //	std::string(buf).append("\r\n")
 

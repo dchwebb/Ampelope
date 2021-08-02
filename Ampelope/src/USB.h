@@ -30,47 +30,26 @@ typedef struct {
 #define  USB_PMA  ((USB_PMA_TypeDef*) USB_PMAADDR)
 #define  USB_EPR  ((USB_EPR_TypeDef*)(&USB->EP0R))
 
+#define USB_REQ_RECIPIENT_MASK			0x03
+#define EP_ADDR_MASK					0xF
+#define USB_REQ_DIRECTION_MASK			0x80
+#define USB_REQ_TYPE_MASK				0x60
 
-// USB Request Recipient types
-#define USB_REQ_RECIPIENT_DEVICE		0x00U
-#define USB_REQ_RECIPIENT_INTERFACE		0x01U
-#define USB_REQ_RECIPIENT_ENDPOINT		0x02U
-#define USB_REQ_RECIPIENT_MASK			0x03U
-
-#define EP_ADDR_MASK					0xFU
-#define USB_REQ_DIRECTION_MASK			0x80U
-
-// USB Request types
-#define USB_REQ_TYPE_STANDARD			0x00U
-#define USB_REQ_TYPE_CLASS				0x20U
-#define USB_REQ_TYPE_VENDOR				0x40U
-#define USB_REQ_TYPE_MASK				0x60U
-
-#define USB_REQ_GET_STATUS				0x00U
-#define USB_REQ_CLEAR_FEATURE			0x01U
-#define USB_REQ_SET_FEATURE				0x03U
-#define USB_REQ_SET_ADDRESS				0x05U
-#define USB_REQ_GET_DESCRIPTOR			0x06U
-#define USB_REQ_SET_DESCRIPTOR			0x07U
-#define USB_REQ_GET_CONFIGURATION		0x08U
-#define USB_REQ_SET_CONFIGURATION		0x09U
-
-#define USB_DESC_TYPE_DEVICE			0x01U
-#define USB_DESC_TYPE_CONFIGURATION		0x02U
-#define USB_DESC_TYPE_STRING			0x03U
-#define USB_DESC_TYPE_INTERFACE			0x04U
-#define USB_DESC_TYPE_ENDPOINT			0x05U
-#define USB_DESC_TYPE_DEVICE_QUALIFIER	0x06U
-#define USB_DESC_TYPE_OTHER_SPEED_CFG	0x07U
-#define USB_DESC_TYPE_IAD				0x0BU
-#define USB_DESC_TYPE_BOS				0x0FU
+#define USB_REQ_GET_STATUS				0x00
+#define USB_REQ_CLEAR_FEATURE			0x01
+#define USB_REQ_SET_FEATURE				0x03
+#define USB_REQ_SET_ADDRESS				0x05
+#define USB_REQ_GET_DESCRIPTOR			0x06
+#define USB_REQ_SET_DESCRIPTOR			0x07
+#define USB_REQ_GET_CONFIGURATION		0x08
+#define USB_REQ_SET_CONFIGURATION		0x09
 
 // Index of string descriptors
-#define USBD_IDX_LANGID_STR				0x00U
-#define USBD_IDX_MFC_STR				0x01U
-#define USBD_IDX_PRODUCT_STR			0x02U
-#define USBD_IDX_SERIAL_STR				0x03U
-#define USBD_IDX_CDC_STR				0x04U
+#define USBD_IDX_LANGID_STR				0x00
+#define USBD_IDX_MFC_STR				0x01
+#define USBD_IDX_PRODUCT_STR			0x02
+#define USBD_IDX_SERIAL_STR				0x03
+#define USBD_IDX_CDC_STR				0x04
 
 #define USBD_VID						1155
 #define USBD_LANGID_STRING				1033
@@ -96,12 +75,15 @@ public:
 
 	std::function<void(uint8_t*,uint32_t)> cdcDataHandler;			// Declare data handler to store incoming CDC data
 
-	enum EndPoint {CDC_In = 0x81, CDC_Out = 0x1, CDC_Cmd = 0x82, };
-	enum EndPointType { Control = 0, Isochronous = 1, Bulk = 2, Interrupt = 3 };
-	enum class Direction {in, out};
-	volatile bool transmitting;
+	bool transmitting;
 
 private:
+	enum EndPoint {CDC_In = 0x81, CDC_Out = 0x1, CDC_Cmd = 0x82, };
+	enum EndPointType {Control = 0, Isochronous = 1, Bulk = 2, Interrupt = 3};
+	enum Descriptor {DeviceDescriptor = 0x1, ConfigurationDescriptor = 0x2, StringDescriptor = 0x3, InterfaceDescriptor = 0x4, EndpointDescriptor = 0x5, DeviceQualifierDescriptor = 0x6, IadDescriptor = 0xb, BosDescriptor = 0xF};
+	enum RequestRecipient {RequestRecipientDevice = 0x0, RequestRecipientInterface = 0x1, RequestRecipientEndpoint = 0x2};
+	enum RequestType {RequestTypeStandard = 0x0, RequestTypeClass = 0x20, RequestTypeVendor = 0x40};
+	enum class Direction {in, out};
 
 	void ProcessSetupPacket();
 	void ReadPMA(uint16_t wPMABufAddr, uint16_t wNBytes);
@@ -114,12 +96,11 @@ private:
 	void IntToUnicode(uint32_t value, uint8_t* pbuf, uint8_t len);
 	uint32_t USBD_GetString(const uint8_t* desc, uint8_t* unicode);
 
-	//usbRequest req;
 	const uint8_t ep_maxPacket = 0x40;
 	uint32_t rxBuff[64];			// Receive data buffer
 	uint32_t rxCount;				// Amount of data to receive
-	const uint8_t* txBuff;			// Pointer to transfer buffer (for transferring data to IN endpoint)
-	uint32_t txBuffSize;
+	const uint8_t* txBuff;			// Pointer to transmit buffer (for transferring data to IN endpoint)
+	uint32_t txBuffSize;			// Size of transmit buffer
 	uint32_t txRemaining;			// If transfer is larger than maximum packet size store remaining byte count
 	uint8_t CmdOpCode;				// stores class specific operation codes (eg CDC set line config)
 	uint8_t dev_address = 0;		// Temporarily hold the device address as it cannot stored in the register until the 0 address response has been handled
@@ -152,7 +133,7 @@ private:
 	// USB standard device descriptor - in usbd_desc.c
 	const uint8_t USBD_FS_DeviceDesc[0x12] = {
 			0x12,					// bLength
-			USB_DESC_TYPE_DEVICE,	// bDescriptorType
+			DeviceDescriptor,		// bDescriptorType
 			0x01,					// bcdUSB  - 0x01 if LPM enabled
 			0x02,
 			0xEF,					// bDeviceClass: (Miscellaneous)
@@ -174,7 +155,7 @@ private:
 	const uint8_t USBD_CDC_CfgFSDesc[USB_CDC_CONFIG_DESC_SIZE] = {
 			// Configuration Descriptor
 			0x09,								// bLength: Configuration Descriptor size
-			USB_DESC_TYPE_CONFIGURATION,		// bDescriptorType: Configuration
+			ConfigurationDescriptor,			// bDescriptorType: Configuration
 			LOBYTE(USB_CDC_CONFIG_DESC_SIZE),	// wTotalLength
 			HIBYTE(USB_CDC_CONFIG_DESC_SIZE),
 			0x02,								// bNumInterfaces: 2 interfaces
@@ -186,7 +167,7 @@ private:
 			//---------------------------------------------------------------------------
 	        // IAD Descriptor - Interface association descriptor for CDC class
 			0x08,								// bLength (8 bytes)
-			USB_DESC_TYPE_IAD,					// bDescriptorType
+			IadDescriptor,						// bDescriptorType
 			0x00,								// bFirstInterface
 			0x02,								// bInterfaceCount
 			0x02,								// bFunctionClass (Communications and CDC Control)
@@ -196,7 +177,7 @@ private:
 
 			// Interface Descriptor
 			0x09,								// bLength: Interface Descriptor size
-			USB_DESC_TYPE_INTERFACE,			// bDescriptorType: Interface
+			InterfaceDescriptor,				// bDescriptorType: Interface
 			0x00,								// bInterfaceNumber: Number of Interface
 			0x00,								// bAlternateSetting: Alternate setting
 			0x01,								// bNumEndpoints: One endpoints used
@@ -234,7 +215,7 @@ private:
 
 			// Endpoint 2 Descriptor
 			0x07,								// bLength: Endpoint Descriptor size
-			USB_DESC_TYPE_ENDPOINT,				// bDescriptorType: Endpoint
+			EndpointDescriptor,					// bDescriptorType: Endpoint
 			CDC_Cmd,							// bEndpointAddress
 			Interrupt,							// bmAttributes: Interrupt
 			0x08,								// wMaxPacketSize
@@ -245,7 +226,7 @@ private:
 
 			// Data class interface descriptor
 			0x09,								// bLength: Endpoint Descriptor size
-			USB_DESC_TYPE_INTERFACE,			// bDescriptorType:
+			InterfaceDescriptor,				// bDescriptorType:
 			0x01,								// bInterfaceNumber: Number of Interface
 			0x00,								// bAlternateSetting: Alternate setting
 			0x02,								// bNumEndpoints: Two endpoints used
@@ -256,7 +237,7 @@ private:
 
 			// Endpoint OUT Descriptor
 			0x07,								// bLength: Endpoint Descriptor size
-			USB_DESC_TYPE_ENDPOINT,				// bDescriptorType: Endpoint
+			EndpointDescriptor,					// bDescriptorType: Endpoint
 			CDC_Out,							// bEndpointAddress
 			Bulk,								// bmAttributes: Bulk
 			LOBYTE(ep_maxPacket),				// wMaxPacketSize:
@@ -265,7 +246,7 @@ private:
 
 			// Endpoint IN Descriptor
 			0x07,								// bLength: Endpoint Descriptor size
-			USB_DESC_TYPE_ENDPOINT,				// bDescriptorType: Endpoint
+			EndpointDescriptor,					// bDescriptorType: Endpoint
 			CDC_In,								// bEndpointAddress
 			Bulk,								// bmAttributes: Bulk
 			LOBYTE(ep_maxPacket),				// wMaxPacketSize:
@@ -278,7 +259,7 @@ private:
 	// Binary Object Store (BOS) Descriptor
 	const uint8_t USBD_FS_BOSDesc[12] = {
 			0x05,								// Length
-			USB_DESC_TYPE_BOS,					// DescriptorType
+			BosDescriptor,						// DescriptorType
 			0x0C,								// TotalLength
 			0x00, 0x01,							// NumDeviceCaps
 
@@ -292,13 +273,13 @@ private:
 
 	uint8_t USBD_StringSerial[0x1A] = {
 			0x1A,								// Length
-			USB_DESC_TYPE_STRING, 				// DescriptorType
+			StringDescriptor, 					// DescriptorType
 	};
 
 	// USB lang indentifier descriptor
 	const uint8_t USBD_LangIDDesc[USB_LEN_LANGID_STR_DESC] = {
 			USB_LEN_LANGID_STR_DESC,
-			USB_DESC_TYPE_STRING,
+			StringDescriptor,
 			LOBYTE(USBD_LANGID_STRING),
 			HIBYTE(USBD_LANGID_STRING)
 	};
