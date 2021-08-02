@@ -15,13 +15,13 @@ extern bool USBDebug;
 
 // Declare registers for PMA area
 typedef struct {
-  volatile uint16_t ADDR0_TX;
-  volatile uint16_t COUNT0_TX;
-  volatile uint16_t ADDR0_RX;
-  volatile uint16_t COUNT0_RX;
+  volatile uint16_t ADDR_TX;
+  volatile uint16_t COUNT_TX;
+  volatile uint16_t ADDR_RX;
+  volatile uint16_t COUNT_RX;
 } USB_PMA_TypeDef;
 
-// Create struct for easy access to end point registers
+// Create struct for easy access to endpoint registers
 typedef struct {
 	volatile uint16_t EPR;
 	volatile uint16_t reserved;
@@ -30,13 +30,6 @@ typedef struct {
 #define  USB_PMA  ((USB_PMA_TypeDef*) USB_PMAADDR)
 #define  USB_EPR  ((USB_EPR_TypeDef*)(&USB->EP0R))
 
-
-// USB Transfer status definitions
-#define STS_GOUT_NAK					1U
-#define STS_DATA_UPDT					2U
-#define STS_XFER_COMP					3U
-#define STS_SETUP_COMP					4U
-#define STS_SETUP_UPDT					6U
 
 // USB Request Recipient types
 #define USB_REQ_RECIPIENT_DEVICE		0x00U
@@ -72,21 +65,6 @@ typedef struct {
 #define USB_DESC_TYPE_IAD				0x0BU
 #define USB_DESC_TYPE_BOS				0x0FU
 
-// EP0 State
-#define USBD_EP0_IDLE					0x00U
-#define USBD_EP0_SETUP					0x01U
-#define USBD_EP0_DATA_IN				0x02U
-#define USBD_EP0_DATA_OUT				0x03U
-#define USBD_EP0_STATUS_IN				0x04U
-#define USBD_EP0_STATUS_OUT				0x05U
-#define USBD_EP0_STALL					0x06U
-
-//  Device Status
-#define USBD_STATE_DEFAULT				0x01U
-#define USBD_STATE_ADDRESSED			0x02U
-#define USBD_STATE_CONFIGURED			0x03U
-#define USBD_STATE_SUSPENDED			0x04U
-
 // Index of string descriptors
 #define USBD_IDX_LANGID_STR				0x00U
 #define USBD_IDX_MFC_STR				0x01U
@@ -98,8 +76,8 @@ typedef struct {
 #define USBD_LANGID_STRING				1033
 #define USBD_MANUFACTURER_STRING		"Mountjoy Modular"
 #define USBD_PID_FS						22352
-#define USBD_PRODUCT_STRING				"Mountjoy Retrospector"
-#define USBD_CDC_STRING					"Mountjoy Retrospector CDC"
+#define USBD_PRODUCT_STRING				"Mountjoy Alligator"
+#define USBD_CDC_STRING					"Mountjoy Alligator CDC"
 
 #define CLASS_SPECIFIC_DESC_SIZE		50
 #define USB_LEN_LANGID_STR_DESC			4
@@ -124,33 +102,29 @@ public:
 	volatile bool transmitting;
 
 private:
-	//void USBD_ParseSetupRequest();
-	void ProcessSetupPacket();
-	void USB_ReadPMA(uint16_t wPMABufAddr, uint16_t wNBytes);
-	void USB_WritePMA(uint16_t wPMABufAddr, uint16_t wNBytes);
-	void USBD_StdItfReq();
 
-	void USB_ActivateEndpoint(uint8_t endpoint, Direction direction, EndPointType eptype, uint16_t pmaAddress);
+	void ProcessSetupPacket();
+	void ReadPMA(uint16_t wPMABufAddr, uint16_t wNBytes);
+	void WritePMA(uint16_t wPMABufAddr, uint16_t wNBytes);
+	void ActivateEndpoint(uint8_t endpoint, Direction direction, EndPointType eptype, uint16_t pmaAddress);
 	void USBD_GetDescriptor();
-	void USBD_StdDevReq();
-	void USB_EPStartXfer(Direction direction, uint8_t endpoint, uint32_t xfer_len);
+	void EPStartXfer(Direction direction, uint8_t endpoint, uint32_t xfer_len);
 	void USBD_CtlError();
-	bool USB_ReadInterrupts(uint32_t interrupt);
+	bool ReadInterrupts(uint32_t interrupt);
 	void IntToUnicode(uint32_t value, uint8_t* pbuf, uint8_t len);
 	uint32_t USBD_GetString(const uint8_t* desc, uint8_t* unicode);
 
 	//usbRequest req;
 	const uint8_t ep_maxPacket = 0x40;
-	uint32_t xfer_buff[64];			// in HAL there is a transfer buffer for each in and out endpoint
-	uint32_t xfer_count;
-	uint32_t xfer_rem;				// If transfer is larger than maximum packet size store remaining byte count
-	const uint8_t* outBuff;			// FIXME - out misleading as this relates to the IN (ie device to Host transfers)??
-	uint32_t outBuffSize;
-	uint32_t outBuffCount;			// Number of bytes already sent to host from a large packet
-	uint32_t ep0_state;
-	uint8_t dev_state;
+	uint32_t rxBuff[64];			// Receive data buffer
+	uint32_t rxCount;				// Amount of data to receive
+	const uint8_t* txBuff;			// Pointer to transfer buffer (for transferring data to IN endpoint)
+	uint32_t txBuffSize;
+	uint32_t txRemaining;			// If transfer is larger than maximum packet size store remaining byte count
 	uint8_t CmdOpCode;				// stores class specific operation codes (eg CDC set line config)
-	uint8_t dev_address = 0;
+	uint8_t dev_address = 0;		// Temporarily hold the device address as it cannot stored in the register until the 0 address response has been handled
+
+	enum class DeviceState {suspended, addressed, configured} dev_state;
 
 	struct usbRequest {
 		uint8_t mRequest;
