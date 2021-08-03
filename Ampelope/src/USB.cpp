@@ -1,6 +1,6 @@
 #include "USB.h"
 
-bool USBDebug = true;
+bool USBDebug = true;		// Used if outputting debug over USB
 
 inline void ClearRxInterrupt(uint8_t ep)
 {
@@ -88,19 +88,19 @@ void USBHandler::ProcessSetupPacket()
 #endif
 	// Previously USBD_StdDevReq
 	if ((req.mRequest & USB_REQ_RECIPIENT_MASK) == RequestRecipientDevice && (req.mRequest & USB_REQ_TYPE_MASK) == RequestTypeStandard) {
-		switch (req.Request) {
-		case USB_REQ_GET_DESCRIPTOR:
-			USBD_GetDescriptor();
+		switch (static_cast<Request>(req.Request)) {
+		case Request::GetDescriptor:
+			GetDescriptor();
 			break;
 
-		case USB_REQ_SET_ADDRESS:
-			dev_address = static_cast<uint8_t>(req.Value) & 0x7F;			// Address address is set on the next interrupt - hold in temp storage
+		case Request::SetAddress:
+			devAddress = static_cast<uint8_t>(req.Value) & 0x7F;			// Address address is set on the next interrupt - hold in temp storage
 
 			EPStartXfer(Direction::in, 0, 0);
 			dev_state = DeviceState::addressed;
 			break;
 
-		case USB_REQ_SET_CONFIGURATION:
+		case Request::SetConfiguration:
 			if (dev_state == DeviceState::addressed) {
 				dev_state = DeviceState::configured;
 
@@ -131,7 +131,7 @@ void USBHandler::ProcessSetupPacket()
 				EPStartXfer(Direction::in, 0, req.Length);
 			} else {
 				//CDC request 0x21, 0x20, 0x0, 0x0, 0x7			 0x21 = [0|01|00001] Host to device | Class | Interface
-				CmdOpCode = req.Request;
+				cmdOpCode = req.Request;
 				EPStartXfer(Direction::out, 0, req.Length);
 			}
 		} else {
@@ -159,7 +159,6 @@ void USBHandler::EPStartXfer(Direction direction, uint8_t endpoint, uint32_t len
 		USB_PMA[epIndex].COUNT_TX = len;
 
 #if (USB_DEBUG)
-				//usbDebug[usbDebugNo].endpoint = epIndex;
 				usbDebug[usbDebugNo].PacketSize = len;
 				if (len > 0) {
 					usbDebug[usbDebugNo].xferBuff0 = ((uint32_t*)txBuff)[0];
@@ -187,9 +186,9 @@ void USBHandler::USBInterruptHandler()						// Originally in Drivers\STM32F4xx_H
 	while (ReadInterrupts(USB_ISTR_CTR)) {					// Originally PCD_EP_ISR_Handler
 		uint8_t epIndex = USB->ISTR & USB_ISTR_EP_ID;		// Extract highest priority endpoint number
 
-		#ifdef USB_DEBUG
+#if (USB_DEBUG)
 		usbDebug[usbDebugNo].endpoint = epIndex;
-		#endif
+#endif
 
 		if (epIndex == 0) {
 			if ((USB->ISTR & USB_ISTR_DIR) == 0) {			// DIR = 0: Direction IN
@@ -208,9 +207,9 @@ void USBHandler::USBInterruptHandler()						// Originally in Drivers\STM32F4xx_H
 					EPStartXfer(Direction::out, 0, 0);
 				}
 
-				if (dev_address > 0 && txBytes == 0) {
-					USB->DADDR = (dev_address | USB_DADDR_EF);
-					dev_address = 0;
+				if (devAddress > 0 && txBytes == 0) {
+					USB->DADDR = (devAddress | USB_DADDR_EF);
+					devAddress = 0;
 				}
 
 			} else {										// DIR = 1: Setup or OUT interrupt
@@ -228,12 +227,12 @@ void USBHandler::USBInterruptHandler()						// Originally in Drivers\STM32F4xx_H
 						ReadPMA(0x18, rxCount);
 
 						// In CDC mode after 0x21 0x20 packets (line coding commands)
-						if (dev_state == DeviceState::configured && CmdOpCode != 0) {
-							if (CmdOpCode == 0x20) {			// SET_LINE_CODING - capture the data passed to return when queried with GET_LINE_CODING
+						if (dev_state == DeviceState::configured && cmdOpCode != 0) {
+							if (cmdOpCode == 0x20) {			// SET_LINE_CODING - capture the data passed to return when queried with GET_LINE_CODING
 								USBD_CDC_LineCoding = *(USBD_CDC_LineCodingTypeDef*)rxBuff;
 							}
 							EPStartXfer(Direction::in, 0, 0);
-							CmdOpCode = 0;
+							cmdOpCode = 0;
 						}
 					}
 
@@ -368,7 +367,7 @@ void USBHandler::ActivateEndpoint(uint8_t endpoint, Direction direction, EndPoin
 }
 
 
-void USBHandler::USBD_GetDescriptor()
+void USBHandler::GetDescriptor()
 {
 	switch (static_cast<Descriptor>(req.Value >> 8))	{
 	case DeviceDescriptor:
@@ -394,11 +393,11 @@ void USBHandler::USBD_GetDescriptor()
 			txBuffSize = sizeof(USBD_LangIDDesc);
 			break;
 		case USBD_IDX_MFC_STR:				// 301
-			txBuffSize = USBD_GetString((uint8_t*)USBD_MANUFACTURER_STRING, USBD_StrDesc);
+			txBuffSize = GetString((uint8_t*)USBD_MANUFACTURER_STRING, USBD_StrDesc);
 			txBuff = USBD_StrDesc;
 			break;
 		case USBD_IDX_PRODUCT_STR:			// 302
-			txBuffSize = USBD_GetString((uint8_t*)USBD_PRODUCT_STRING, USBD_StrDesc);
+			txBuffSize = GetString((uint8_t*)USBD_PRODUCT_STRING, USBD_StrDesc);
 			txBuff = USBD_StrDesc;
 			break;
 		case USBD_IDX_SERIAL_STR:			// 303
@@ -424,7 +423,7 @@ void USBHandler::USBD_GetDescriptor()
 	      break;
 */
 	    case USBD_IDX_CDC_STR:				// 304
-			txBuffSize = USBD_GetString((uint8_t*)USBD_CDC_STRING, USBD_StrDesc);
+			txBuffSize = GetString((uint8_t*)USBD_CDC_STRING, USBD_StrDesc);
 			txBuff = USBD_StrDesc;
 	      break;
 
@@ -451,7 +450,7 @@ void USBHandler::USBD_GetDescriptor()
 }
 
 
-uint32_t USBHandler::USBD_GetString(const uint8_t* desc, uint8_t *unicode)
+uint32_t USBHandler::GetString(const uint8_t* desc, uint8_t *unicode)
 {
 	uint32_t idx = 2;
 
@@ -482,15 +481,8 @@ void USBHandler::IntToUnicode(uint32_t value, uint8_t* pbuf, uint8_t len)
 }
 
 
-void USBHandler::USBD_CtlError()
-{
-	SetTxStatus(0, USB_EP_TX_STALL);
-}
-
-
 bool USBHandler::ReadInterrupts(uint32_t interrupt)
 {
-
 #if (USB_DEBUG)
 	if ((USB->ISTR & interrupt) == interrupt && usbDebugEvent < USB_DEBUG_COUNT) {
 		usbDebugNo = usbDebugEvent % USB_DEBUG_COUNT;
@@ -504,7 +496,8 @@ bool USBHandler::ReadInterrupts(uint32_t interrupt)
 }
 
 
-void USBHandler::SendData(const uint8_t* data, uint16_t len, uint8_t endpoint) {
+void USBHandler::SendData(const uint8_t* data, uint16_t len, uint8_t endpoint)
+{
 	if (dev_state == DeviceState::configured) {
 		if (!transmitting) {
 			transmitting = true;
@@ -516,7 +509,8 @@ void USBHandler::SendData(const uint8_t* data, uint16_t len, uint8_t endpoint) {
 }
 
 
-void USBHandler::SendString(const char* s) {
+void USBHandler::SendString(const char* s)
+{
 	uint16_t counter = 0;
 	while (transmitting && counter < 10000) {
 		++counter;
@@ -525,19 +519,22 @@ void USBHandler::SendString(const char* s) {
 }
 
 
-void USBHandler::SendString(std::string s) {
+void USBHandler::SendString(std::string s)
+{
 	SendString(s.c_str());
 }
 
 
 #if (USB_DEBUG)
 
-void USBHandler::OutputDebug() {
+void USBHandler::OutputDebug()
+{
 	USBDebug = false;
 
 	uartSendString("Event,Interrupt,Name,Desc,Endpoint,mRequest,Request,Value,Index,Length,PacketSize,XferBuff,\n");
 	uint16_t evNo = usbDebugEvent % USB_DEBUG_COUNT;
 	std::string interrupt, subtype;
+
 	for (int i = 0; i < USB_DEBUG_COUNT; ++i) {
 		if ((usbDebug[evNo].Interrupt & USB_ISTR_CTR) == USB_ISTR_CTR) {
 			if ((usbDebug[evNo].Interrupt & USB_ISTR_DIR) == USB_ISTR_DIR) {
@@ -609,7 +606,6 @@ void USBHandler::OutputDebug() {
 		if ((usbDebug[evNo].Interrupt & USB_ISTR_WKUP) == USB_ISTR_WKUP) {
 			interrupt = "WKUP";
 		}
-
 
 		if ((usbDebug[evNo].Interrupt & USB_ISTR_RESET) == USB_ISTR_RESET) {
 			interrupt = "RESET";

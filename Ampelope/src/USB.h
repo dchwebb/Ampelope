@@ -35,15 +35,6 @@ typedef struct {
 #define USB_REQ_DIRECTION_MASK			0x80
 #define USB_REQ_TYPE_MASK				0x60
 
-#define USB_REQ_GET_STATUS				0x00
-#define USB_REQ_CLEAR_FEATURE			0x01
-#define USB_REQ_SET_FEATURE				0x03
-#define USB_REQ_SET_ADDRESS				0x05
-#define USB_REQ_GET_DESCRIPTOR			0x06
-#define USB_REQ_SET_DESCRIPTOR			0x07
-#define USB_REQ_GET_CONFIGURATION		0x08
-#define USB_REQ_SET_CONFIGURATION		0x09
-
 // Index of string descriptors
 #define USBD_IDX_LANGID_STR				0x00
 #define USBD_IDX_MFC_STR				0x01
@@ -83,18 +74,18 @@ private:
 	enum Descriptor {DeviceDescriptor = 0x1, ConfigurationDescriptor = 0x2, StringDescriptor = 0x3, InterfaceDescriptor = 0x4, EndpointDescriptor = 0x5, DeviceQualifierDescriptor = 0x6, IadDescriptor = 0xb, BosDescriptor = 0xF};
 	enum RequestRecipient {RequestRecipientDevice = 0x0, RequestRecipientInterface = 0x1, RequestRecipientEndpoint = 0x2};
 	enum RequestType {RequestTypeStandard = 0x0, RequestTypeClass = 0x20, RequestTypeVendor = 0x40};
+	enum class Request {GetStatus = 0x0, SetAddress = 0x5, GetDescriptor = 0x6, SetConfiguration = 0x9};
 	enum class Direction {in, out};
 
 	void ProcessSetupPacket();
 	void ReadPMA(uint16_t wPMABufAddr, uint16_t wNBytes);
 	void WritePMA(uint16_t wPMABufAddr, uint16_t wNBytes);
 	void ActivateEndpoint(uint8_t endpoint, Direction direction, EndPointType eptype, uint16_t pmaAddress);
-	void USBD_GetDescriptor();
+	void GetDescriptor();
 	void EPStartXfer(Direction direction, uint8_t endpoint, uint32_t xfer_len);
-	void USBD_CtlError();
 	bool ReadInterrupts(uint32_t interrupt);
 	void IntToUnicode(uint32_t value, uint8_t* pbuf, uint8_t len);
-	uint32_t USBD_GetString(const uint8_t* desc, uint8_t* unicode);
+	uint32_t GetString(const uint8_t* desc, uint8_t* unicode);
 
 	const uint8_t maxPacket = 0x40;
 	uint32_t rxBuff[64];			// Receive data buffer
@@ -102,8 +93,8 @@ private:
 	const uint8_t* txBuff;			// Pointer to transmit buffer (for transferring data to IN endpoint)
 	uint32_t txBuffSize;			// Size of transmit buffer
 	uint32_t txRemaining;			// If transfer is larger than maximum packet size store remaining byte count
-	uint8_t CmdOpCode;				// stores class specific operation codes (eg CDC set line config)
-	uint8_t dev_address = 0;		// Temporarily hold the device address as it cannot stored in the register until the 0 address response has been handled
+	uint8_t cmdOpCode;				// stores class specific operation codes (eg CDC set line config)
+	uint8_t devAddress = 0;			// Temporarily hold the device address as it cannot stored in the register until the 0 address response has been handled
 
 	enum class DeviceState {suspended, addressed, configured} dev_state;
 
