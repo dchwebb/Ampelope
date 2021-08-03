@@ -96,7 +96,7 @@ private:
 	void IntToUnicode(uint32_t value, uint8_t* pbuf, uint8_t len);
 	uint32_t USBD_GetString(const uint8_t* desc, uint8_t* unicode);
 
-	const uint8_t ep_maxPacket = 0x40;
+	const uint8_t maxPacket = 0x40;
 	uint32_t rxBuff[64];			// Receive data buffer
 	uint32_t rxCount;				// Amount of data to receive
 	const uint8_t* txBuff;			// Pointer to transmit buffer (for transferring data to IN endpoint)
@@ -139,7 +139,7 @@ private:
 			0xEF,					// bDeviceClass: (Miscellaneous)
 			0x02,					// bDeviceSubClass (Interface Association Descriptor- with below)
 			0x01,					// bDeviceProtocol (Interface Association Descriptor)
-			ep_maxPacket,  			// bMaxPacketSize
+			maxPacket,  			// bMaxPacketSize
 			LOBYTE(USBD_VID),		// idVendor
 			HIBYTE(USBD_VID),		// idVendor
 			LOBYTE(USBD_PID_FS),	// idProduct
@@ -240,8 +240,8 @@ private:
 			EndpointDescriptor,					// bDescriptorType: Endpoint
 			CDC_Out,							// bEndpointAddress
 			Bulk,								// bmAttributes: Bulk
-			LOBYTE(ep_maxPacket),				// wMaxPacketSize:
-			HIBYTE(ep_maxPacket),
+			LOBYTE(maxPacket),					// wMaxPacketSize:
+			HIBYTE(maxPacket),
 			0x00,								// bInterval: ignore for Bulk transfer
 
 			// Endpoint IN Descriptor
@@ -249,8 +249,8 @@ private:
 			EndpointDescriptor,					// bDescriptorType: Endpoint
 			CDC_In,								// bEndpointAddress
 			Bulk,								// bmAttributes: Bulk
-			LOBYTE(ep_maxPacket),				// wMaxPacketSize:
-			HIBYTE(ep_maxPacket),
+			LOBYTE(maxPacket),					// wMaxPacketSize:
+			HIBYTE(maxPacket),
 			0x00								// bInterval: ignore for Bulk transfer
 	};
 
@@ -294,7 +294,6 @@ public:
 	struct usbDebugItem {
 		uint16_t eventNo;
 		uint32_t Interrupt;
-		uint32_t IntData;
 		usbRequest Request;
 		uint8_t endpoint;
 		uint16_t PacketSize;
