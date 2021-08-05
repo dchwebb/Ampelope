@@ -46,8 +46,8 @@ typedef struct {
 #define USBD_LANGID_STRING				1033
 #define USBD_MANUFACTURER_STRING		"Mountjoy Modular"
 #define USBD_PID_FS						22352
-#define USBD_PRODUCT_STRING				"Mountjoy Alligator"
-#define USBD_CDC_STRING					"Mountjoy Alligator CDC"
+#define USBD_PRODUCT_STRING				"Mountjoy Ampelope"
+#define USBD_CDC_STRING					"Mountjoy Ampelope CDC"
 
 #define CLASS_SPECIFIC_DESC_SIZE		50
 #define USB_LEN_LANGID_STR_DESC			4
@@ -96,7 +96,7 @@ private:
 	uint8_t cmdOpCode;				// stores class specific operation codes (eg CDC set line config)
 	uint8_t devAddress = 0;			// Temporarily hold the device address as it cannot stored in the register until the 0 address response has been handled
 
-	enum class DeviceState {suspended, addressed, configured} dev_state;
+	enum class DeviceState {Suspended, Addressed, Configured} dev_state;
 
 	struct usbRequest {
 		uint8_t mRequest;

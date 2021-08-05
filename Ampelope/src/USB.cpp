@@ -97,12 +97,12 @@ void USBHandler::ProcessSetupPacket()
 			devAddress = static_cast<uint8_t>(req.Value) & 0x7F;			// Address address is set on the next interrupt - hold in temp storage
 
 			EPStartXfer(Direction::in, 0, 0);
-			dev_state = DeviceState::addressed;
+			dev_state = DeviceState::Addressed;
 			break;
 
 		case Request::SetConfiguration:
-			if (dev_state == DeviceState::addressed) {
-				dev_state = DeviceState::configured;
+			if (dev_state == DeviceState::Addressed) {
+				dev_state = DeviceState::Configured;
 
 				ActivateEndpoint(CDC_In,  Direction::in,  Bulk,      0xC0);			// Activate CDC in endpoint
 				ActivateEndpoint(CDC_Out, Direction::out, Bulk,      0x110);		// Activate CDC out endpoint
@@ -227,7 +227,7 @@ void USBHandler::USBInterruptHandler()						// Originally in Drivers\STM32F4xx_H
 						ReadPMA(0x18, rxCount);
 
 						// In CDC mode after 0x21 0x20 packets (line coding commands)
-						if (dev_state == DeviceState::configured && cmdOpCode != 0) {
+						if (dev_state == DeviceState::Configured && cmdOpCode != 0) {
 							if (cmdOpCode == 0x20) {			// SET_LINE_CODING - capture the data passed to return when queried with GET_LINE_CODING
 								USBD_CDC_LineCoding = *(USBD_CDC_LineCodingTypeDef*)rxBuff;
 							}
@@ -259,7 +259,6 @@ void USBHandler::USBInterruptHandler()						// Originally in Drivers\STM32F4xx_H
 				ClearTxInterrupt(epIndex);
 
 				uint16_t txBytes = USB_PMA[epIndex].COUNT_TX & USB_COUNT0_TX_COUNT0_TX;
-
 				if (txBuffSize > txBytes) {					// Transmitting data larger than buffer size
 					txBuffSize -= txBytes;
 					txBuff += txBytes;
@@ -284,7 +283,7 @@ void USBHandler::USBInterruptHandler()						// Originally in Drivers\STM32F4xx_H
 		USB->CNTR |= USB_CNTR_FSUSP;
 		USB->ISTR &= ~USB_ISTR_SUSP;
 		USB->CNTR |= USB_CNTR_LPMODE;
-		dev_state = DeviceState::suspended;
+		dev_state = DeviceState::Suspended;
 	}
 
 	/////////// 	400 		RESET: Reset Interrupt
@@ -498,7 +497,7 @@ bool USBHandler::ReadInterrupts(uint32_t interrupt)
 
 void USBHandler::SendData(const uint8_t* data, uint16_t len, uint8_t endpoint)
 {
-	if (dev_state == DeviceState::configured) {
+	if (dev_state == DeviceState::Configured) {
 		if (!transmitting) {
 			transmitting = true;
 			txBuff = (uint8_t*)data;
