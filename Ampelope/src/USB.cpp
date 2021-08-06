@@ -29,33 +29,18 @@ inline void SetRxStatus(uint8_t ep, uint16_t status)		// Set endpoint receive st
 }
 
 
-void USBHandler::ReadPMA(uint16_t wPMABufAddr, uint16_t wNBytes)
+void USBHandler::ReadPMA(uint16_t pma, uint16_t bytes)
 {
-	uint32_t n = (uint32_t)wNBytes >> 1;
-	uint32_t i, temp;
-	volatile uint16_t *pdwVal;
-	uint8_t *pBuf = (uint8_t *)(&rxBuff);
+	volatile uint16_t* pmaBuff = reinterpret_cast<volatile uint16_t*>(USB_PMAADDR + pma);		// Eg 0x40006018
 
-	pdwVal = (volatile uint16_t *)(USB_PMAADDR + wPMABufAddr);		// 0x40006018
-
-	for (i = n; i != 0; i--) {
-		temp = *pdwVal;
-		pdwVal++;
-		*pBuf = (uint8_t)((temp >> 0) & 0xFFU);
-		pBuf++;
-		*pBuf = (uint8_t)((temp >> 8) & 0xFFU);
-		pBuf++;
-	}
-
-	if ((wNBytes % 2U) != 0) {
-		temp = *pdwVal;
-		*pBuf = (uint8_t)((temp >> 0) & 0xFFU);
+	for (int i = 0; i < (bytes + 1) / 2; i++) {
+		reinterpret_cast<volatile uint16_t*>(rxBuff)[i] = *pmaBuff++;				// pma buffer can only be read in 16 bit words
 	}
 
 #if (USB_DEBUG)
-				usbDebug[usbDebugNo].PacketSize = wNBytes;
-				usbDebug[usbDebugNo].xferBuff0 = rxBuff[0];
-				usbDebug[usbDebugNo].xferBuff1 = rxBuff[1];
+	usbDebug[usbDebugNo].PacketSize = bytes;
+	usbDebug[usbDebugNo].xferBuff0 = ((uint32_t*)rxBuff)[0];
+	usbDebug[usbDebugNo].xferBuff1 = ((uint32_t*)rxBuff)[1];
 #endif
 }
 
@@ -81,7 +66,7 @@ void USBHandler::WritePMA(uint16_t wPMABufAddr, uint16_t wNBytes)
 
 void USBHandler::ProcessSetupPacket()
 {
-	req.loadData(reinterpret_cast<uint8_t*>(&rxBuff));		// Parse the setup request into the req object
+	req.loadData(rxBuff);		// Parse the setup request into the req object
 
 #if (USB_DEBUG)
 	usbDebug[usbDebugNo].Request = req;
@@ -229,7 +214,7 @@ void USBHandler::USBInterruptHandler()						// Originally in Drivers\STM32F4xx_H
 						// In CDC mode after 0x21 0x20 packets (line coding commands)
 						if (dev_state == DeviceState::Configured && cmdOpCode != 0) {
 							if (cmdOpCode == 0x20) {			// SET_LINE_CODING - capture the data passed to return when queried with GET_LINE_CODING
-								USBD_CDC_LineCoding = *(USBD_CDC_LineCodingTypeDef*)rxBuff;
+								USBD_CDC_LineCoding = *(reinterpret_cast<USBD_CDC_LineCodingTypeDef*>(rxBuff));
 							}
 							EPStartXfer(Direction::in, 0, 0);
 							cmdOpCode = 0;
@@ -251,7 +236,7 @@ void USBHandler::USBInterruptHandler()						// Originally in Drivers\STM32F4xx_H
 				}
 				SetRxStatus(epIndex, USB_EP_RX_VALID);
 
-				cdcDataHandler((uint8_t*)rxBuff, rxCount);
+				cdcDataHandler(rxBuff, rxCount);
 			}
 
 			if ((USB_EPR[epIndex].EPR & USB_EP_CTR_TX) != 0) {
@@ -259,7 +244,7 @@ void USBHandler::USBInterruptHandler()						// Originally in Drivers\STM32F4xx_H
 				ClearTxInterrupt(epIndex);
 
 				uint16_t txBytes = USB_PMA[epIndex].COUNT_TX & USB_COUNT0_TX_COUNT0_TX;
-				if (txBuffSize > txBytes) {					// Transmitting data larger than buffer size
+				if (txBuffSize >= txBytes) {					// Transmitting data larger than buffer size
 					txBuffSize -= txBytes;
 					txBuff += txBytes;
 					EPStartXfer(Direction::in, epIndex, txBuffSize);

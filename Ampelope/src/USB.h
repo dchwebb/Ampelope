@@ -87,8 +87,8 @@ private:
 	void IntToUnicode(uint32_t value, uint8_t* pbuf, uint8_t len);
 	uint32_t GetString(const uint8_t* desc, uint8_t* unicode);
 
-	const uint8_t maxPacket = 0x40;
-	uint32_t rxBuff[64];			// Receive data buffer
+	static const uint8_t maxPacket = 0x40;
+	uint8_t rxBuff[maxPacket] __attribute__ ((aligned (4)));		// Receive data buffer - must be aligned to allow copying to other structures
 	uint32_t rxCount;				// Amount of data to receive
 	const uint8_t* txBuff;			// Pointer to transmit buffer (for transferring data to IN endpoint)
 	uint32_t txBuffSize;			// Size of transmit buffer
