@@ -31,27 +31,13 @@ typedef struct {
 #define  USB_EPR  ((USB_EPR_TypeDef*)(&USB->EP0R))
 
 #define USB_REQ_RECIPIENT_MASK			0x03
-#define EP_ADDR_MASK					0xF
+#define EP_ADDR_MASK					0x0F
 #define USB_REQ_DIRECTION_MASK			0x80
 #define USB_REQ_TYPE_MASK				0x60
 
-// Index of string descriptors
-#define USBD_IDX_LANGID_STR				0x00
-#define USBD_IDX_MFC_STR				0x01
-#define USBD_IDX_PRODUCT_STR			0x02
-#define USBD_IDX_SERIAL_STR				0x03
-#define USBD_IDX_CDC_STR				0x04
-
-#define USBD_VID						1155
-#define USBD_LANGID_STRING				1033
-#define USBD_MANUFACTURER_STRING		"Mountjoy Modular"
-#define USBD_PID_FS						22352
-#define USBD_PRODUCT_STRING				"Mountjoy Ampelope"
-#define USBD_CDC_STRING					"Mountjoy Ampelope CDC"
-
-#define CLASS_SPECIFIC_DESC_SIZE		50
-#define USB_LEN_LANGID_STR_DESC			4
-#define USB_CDC_CONFIG_DESC_SIZE		75
+#define USBD_VID						0x483		// Vendor ID - use STMicro
+#define USBD_LANGID						1033		// Language - en-US
+#define USBD_PID						22352		// Product ID
 
 #define LOBYTE(x)  (static_cast<uint8_t>(x & 0x00FFU))
 #define HIBYTE(x)  (static_cast<uint8_t>((x & 0xFF00U) >> 8))
@@ -69,11 +55,16 @@ public:
 	bool transmitting;
 
 private:
+	static constexpr const char* manufacturerString = "Mountjoy Modular";
+	static constexpr const char* productString      = "Mountjoy Ampelope";
+	static constexpr const char* cdcString          = "Mountjoy Ampelope CDC";
+
 	enum EndPoint {CDC_In = 0x81, CDC_Out = 0x1, CDC_Cmd = 0x82, };
 	enum EndPointType {Control = 0, Isochronous = 1, Bulk = 2, Interrupt = 3};
 	enum Descriptor {DeviceDescriptor = 0x1, ConfigurationDescriptor = 0x2, StringDescriptor = 0x3, InterfaceDescriptor = 0x4, EndpointDescriptor = 0x5, DeviceQualifierDescriptor = 0x6, IadDescriptor = 0xb, BosDescriptor = 0xF};
 	enum RequestRecipient {RequestRecipientDevice = 0x0, RequestRecipientInterface = 0x1, RequestRecipientEndpoint = 0x2};
 	enum RequestType {RequestTypeStandard = 0x0, RequestTypeClass = 0x20, RequestTypeVendor = 0x40};
+	enum StrDescIndex {LangIDStrIndex = 0, MfcStrIndex = 1, ProductStrIndex = 2, SerialStrIndex = 3, CDCStrIndex = 4};
 	enum class Request {GetStatus = 0x0, SetAddress = 0x5, GetDescriptor = 0x6, SetConfiguration = 0x9};
 	enum class Direction {in, out};
 
@@ -85,7 +76,8 @@ private:
 	void EPStartXfer(Direction direction, uint8_t endpoint, uint32_t xfer_len);
 	bool ReadInterrupts(uint32_t interrupt);
 	void IntToUnicode(uint32_t value, uint8_t* pbuf, uint8_t len);
-	uint32_t GetString(const uint8_t* desc, uint8_t* unicode);
+	uint32_t GetString(const char* desc);
+	void StringToTxBuff(const char* desc);
 
 	static const uint8_t maxPacket = 0x40;
 	uint8_t rxBuff[maxPacket] __attribute__ ((aligned (4)));		// Receive data buffer - must be aligned to allow copying to other structures
@@ -96,59 +88,61 @@ private:
 	uint8_t cmdOpCode;				// stores class specific operation codes (eg CDC set line config)
 	uint8_t devAddress = 0;			// Temporarily hold the device address as it cannot stored in the register until the 0 address response has been handled
 
-	enum class DeviceState {Suspended, Addressed, Configured} dev_state;
+	enum class DeviceState {Suspended, Addressed, Configured} devState;
 
 	struct usbRequest {
-		uint8_t mRequest;
-		uint8_t Request;
-		uint16_t Value;
-		uint16_t Index;
-		uint16_t Length;
+		uint8_t bmRequest;
+		uint8_t bRequest;
+		uint16_t wValue;
+		uint16_t wIndex;
+		uint16_t wLength;
 
 		void loadData(const uint8_t* data) {
-			mRequest = data[0];
-			Request = data[1];
-			Value = static_cast<uint16_t>(data[2]) + (data[3] << 8);
-			Index = static_cast<uint16_t>(data[4]) + (data[5] << 8);
-			Length = static_cast<uint16_t>(data[6]) + (data[7] << 8);
+			bmRequest = data[0];
+			bRequest = data[1];
+			wValue = static_cast<uint16_t>(data[2]) + (data[3] << 8);
+			wIndex = static_cast<uint16_t>(data[4]) + (data[5] << 8);
+			wLength = static_cast<uint16_t>(data[6]) + (data[7] << 8);
 		}
 	} req;
 
 	struct USBD_CDC_LineCodingTypeDef {
-		uint32_t bitrate;    		// Data terminal rate in bits per sec.
-		uint8_t format;      		// Stop Bits: 0-1 Stop Bit; 1-1.5 Stop Bits; 2-2 Stop Bits
-		uint8_t paritytype;  		// Parity: 0 = None; 1 = Odd; 2 = Even; 3 = Mark; 4 = Space; 6 bDataBits 1 Data bits
-		uint8_t datatype;    		// Data bits (5, 6, 7,	8 or 16)
+		uint32_t bitrate;    					// Data terminal rate in bits per sec.
+		uint8_t format;      					// Stop Bits: 0-1 Stop Bit; 1-1.5 Stop Bits; 2-2 Stop Bits
+		uint8_t paritytype;  					// Parity: 0 = None; 1 = Odd; 2 = Even; 3 = Mark; 4 = Space; 6 bDataBits 1 Data bits
+		uint8_t datatype;    					// Data bits (5, 6, 7,	8 or 16)
 	} USBD_CDC_LineCoding;
 
 	// USB standard device descriptor - in usbd_desc.c
 	const uint8_t USBD_FS_DeviceDesc[0x12] = {
-			0x12,					// bLength
-			DeviceDescriptor,		// bDescriptorType
-			0x01,					// bcdUSB  - 0x01 if LPM enabled
+			0x12,								// bLength
+			DeviceDescriptor,					// bDescriptorType
+			0x01,								// bcdUSB  - 0x01 if LPM enabled
 			0x02,
-			0xEF,					// bDeviceClass: (Miscellaneous)
-			0x02,					// bDeviceSubClass (Interface Association Descriptor- with below)
-			0x01,					// bDeviceProtocol (Interface Association Descriptor)
-			maxPacket,  			// bMaxPacketSize
-			LOBYTE(USBD_VID),		// idVendor
-			HIBYTE(USBD_VID),		// idVendor
-			LOBYTE(USBD_PID_FS),	// idProduct
-			HIBYTE(USBD_PID_FS),	// idProduct
-			0x00,					// bcdDevice rel. 2.00
+			0xEF,								// bDeviceClass: (Miscellaneous)
+			0x02,								// bDeviceSubClass (Interface Association Descriptor- with below)
+			0x01,								// bDeviceProtocol (Interface Association Descriptor)
+			maxPacket,  						// bMaxPacketSize
+			LOBYTE(USBD_VID),					// idVendor
+			HIBYTE(USBD_VID),					// idVendor
+			LOBYTE(USBD_PID),					// idProduct
+			HIBYTE(USBD_PID),					// idProduct
+			0x00,								// bcdDevice rel. 2.00
 			0x02,
-			USBD_IDX_MFC_STR,		// Index of manufacturer  string
-			USBD_IDX_PRODUCT_STR,	// Index of product string
-			USBD_IDX_SERIAL_STR,	// Index of serial number string
-			0x01					// bNumConfigurations
+			MfcStrIndex,						// Index of manufacturer  string
+			ProductStrIndex,					// Index of product string
+			SerialStrIndex,						// Index of serial number string
+			0x01								// bNumConfigurations
 	};
 
-	const uint8_t USBD_CDC_CfgFSDesc[USB_CDC_CONFIG_DESC_SIZE] = {
+	static const uint8_t cdcDescSize = 75;
+
+	const uint8_t USBD_CDC_CfgFSDesc[cdcDescSize] = {
 			// Configuration Descriptor
 			0x09,								// bLength: Configuration Descriptor size
 			ConfigurationDescriptor,			// bDescriptorType: Configuration
-			LOBYTE(USB_CDC_CONFIG_DESC_SIZE),	// wTotalLength
-			HIBYTE(USB_CDC_CONFIG_DESC_SIZE),
+			LOBYTE(cdcDescSize),				// wTotalLength
+			HIBYTE(cdcDescSize),
 			0x02,								// bNumInterfaces: 2 interfaces
 			0x01,								// bConfigurationValue: Configuration value
 			0x00,								// iConfiguration: Index of string descriptor describing the configuration
@@ -164,7 +158,7 @@ private:
 			0x02,								// bFunctionClass (Communications and CDC Control)
 			0x02,								// bFunctionSubClass
 			0x01,								// bFunctionProtocol
-			USBD_IDX_CDC_STR,					// iFunction (String Descriptor 6)
+			CDCStrIndex,						// iFunction (String Descriptor 6)
 
 			// Interface Descriptor
 			0x09,								// bLength: Interface Descriptor size
@@ -175,7 +169,7 @@ private:
 			0x02,								// bInterfaceClass: Communication Interface Class
 			0x02,								// bInterfaceSubClass: Abstract Control Model
 			0x01,								// bInterfaceProtocol: Common AT commands
-			USBD_IDX_CDC_STR,					// iInterface
+			CDCStrIndex,						// iInterface
 
 			// Header Functional Descriptor
 			0x05,								// bLength: Endpoint Descriptor size
@@ -268,14 +262,14 @@ private:
 	};
 
 	// USB lang indentifier descriptor
-	const uint8_t USBD_LangIDDesc[USB_LEN_LANGID_STR_DESC] = {
-			USB_LEN_LANGID_STR_DESC,
+	const uint8_t USBD_LangIDDesc[4] = {
+			0x04,
 			StringDescriptor,
-			LOBYTE(USBD_LANGID_STRING),
-			HIBYTE(USBD_LANGID_STRING)
+			LOBYTE(USBD_LANGID),
+			HIBYTE(USBD_LANGID)
 	};
 
-	uint8_t USBD_StrDesc[128];
+	uint8_t unicodeString[128];
 
 public:
 #if (USB_DEBUG)

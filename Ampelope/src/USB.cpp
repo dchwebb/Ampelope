@@ -44,25 +44,16 @@ void USBHandler::ReadPMA(uint16_t pma, uint16_t bytes)
 #endif
 }
 
-void USBHandler::WritePMA(uint16_t wPMABufAddr, uint16_t wNBytes)
+
+void USBHandler::WritePMA(uint16_t pma, uint16_t bytes)
 {
-	uint32_t n = ((uint32_t)wNBytes + 1U) >> 1;
-	uint32_t i, temp1, temp2;
-	volatile uint16_t *pdwVal;
-	uint8_t *pBuf = (uint8_t *)txBuff;
+	volatile uint16_t* pmaBuff = reinterpret_cast<volatile uint16_t*>(USB_PMAADDR + pma);
 
-	pdwVal = (volatile uint16_t *)((uint32_t)USB + 0x400U + ((uint32_t)wPMABufAddr));
-
-	for (i = n; i != 0; i--) {
-		temp1 = *pBuf;
-		pBuf++;
-		temp2 = temp1 | ((uint16_t)((uint16_t) *pBuf << 8));
-		*pdwVal = (uint16_t)temp2;
-		pdwVal++;
-
-		pBuf++;
+	for (int i = 0; i < (bytes + 1) / 2; i++) {
+		pmaBuff[i] = reinterpret_cast<const uint16_t*>(txBuff)[i];
 	}
 }
+
 
 void USBHandler::ProcessSetupPacket()
 {
@@ -72,22 +63,22 @@ void USBHandler::ProcessSetupPacket()
 	usbDebug[usbDebugNo].Request = req;
 #endif
 	// Previously USBD_StdDevReq
-	if ((req.mRequest & USB_REQ_RECIPIENT_MASK) == RequestRecipientDevice && (req.mRequest & USB_REQ_TYPE_MASK) == RequestTypeStandard) {
-		switch (static_cast<Request>(req.Request)) {
+	if ((req.bmRequest & USB_REQ_RECIPIENT_MASK) == RequestRecipientDevice && (req.bmRequest & USB_REQ_TYPE_MASK) == RequestTypeStandard) {
+		switch (static_cast<Request>(req.bRequest)) {
 		case Request::GetDescriptor:
 			GetDescriptor();
 			break;
 
 		case Request::SetAddress:
-			devAddress = static_cast<uint8_t>(req.Value) & 0x7F;			// Address address is set on the next interrupt - hold in temp storage
+			devAddress = static_cast<uint8_t>(req.wValue) & 0x7F;			// Address address is set on the next interrupt - hold in temp storage
 
 			EPStartXfer(Direction::in, 0, 0);
-			dev_state = DeviceState::Addressed;
+			devState = DeviceState::Addressed;
 			break;
 
 		case Request::SetConfiguration:
-			if (dev_state == DeviceState::Addressed) {
-				dev_state = DeviceState::Configured;
+			if (devState == DeviceState::Addressed) {
+				devState = DeviceState::Configured;
 
 				ActivateEndpoint(CDC_In,  Direction::in,  Bulk,      0xC0);			// Activate CDC in endpoint
 				ActivateEndpoint(CDC_Out, Direction::out, Bulk,      0x110);		// Activate CDC out endpoint
@@ -105,19 +96,19 @@ void USBHandler::ProcessSetupPacket()
 		}
 
 	// Previously USBD_StdItfReq
-	} else if ((req.mRequest & USB_REQ_RECIPIENT_MASK) == RequestRecipientInterface && (req.mRequest & USB_REQ_TYPE_MASK) == RequestTypeClass) {
-		if (req.Length != 0) {
-			if ((req.mRequest & USB_REQ_DIRECTION_MASK) != 0)	{		// Device to host
+	} else if ((req.bmRequest & USB_REQ_RECIPIENT_MASK) == RequestRecipientInterface && (req.bmRequest & USB_REQ_TYPE_MASK) == RequestTypeClass) {
+		if (req.wLength != 0) {
+			if ((req.bmRequest & USB_REQ_DIRECTION_MASK) != 0)	{		// Device to host
 				// CDC request 0xA1, 0x21, 0x0, 0x0, 0x7		GetLineCoding 0xA1 0x21 0 Interface 7; Data: Line Coding Data Structure
 				// 0xA1 [1|01|00001] Device to host | Class | Interface
-				txBuffSize = req.Length;
+				txBuffSize = req.wLength;
 				txBuff = (uint8_t*)&USBD_CDC_LineCoding;
 
-				EPStartXfer(Direction::in, 0, req.Length);
+				EPStartXfer(Direction::in, 0, req.wLength);
 			} else {
 				//CDC request 0x21, 0x20, 0x0, 0x0, 0x7			 0x21 = [0|01|00001] Host to device | Class | Interface
-				cmdOpCode = req.Request;
-				EPStartXfer(Direction::out, 0, req.Length);
+				cmdOpCode = req.bRequest;
+				EPStartXfer(Direction::out, 0, req.wLength);
 			}
 		} else {
 			// 0x21, 0x22, 0x0, 0x0, 0x0	SetControlLineState 0x21 | 0x22 | 2 | Interface | 0 | None
@@ -212,7 +203,7 @@ void USBHandler::USBInterruptHandler()						// Originally in Drivers\STM32F4xx_H
 						ReadPMA(0x18, rxCount);
 
 						// In CDC mode after 0x21 0x20 packets (line coding commands)
-						if (dev_state == DeviceState::Configured && cmdOpCode != 0) {
+						if (devState == DeviceState::Configured && cmdOpCode != 0) {
 							if (cmdOpCode == 0x20) {			// SET_LINE_CODING - capture the data passed to return when queried with GET_LINE_CODING
 								USBD_CDC_LineCoding = *(reinterpret_cast<USBD_CDC_LineCodingTypeDef*>(rxBuff));
 							}
@@ -220,7 +211,6 @@ void USBHandler::USBInterruptHandler()						// Originally in Drivers\STM32F4xx_H
 							cmdOpCode = 0;
 						}
 					}
-
 					SetRxStatus(0, USB_EP_RX_VALID);
 				}
 			}
@@ -268,7 +258,7 @@ void USBHandler::USBInterruptHandler()						// Originally in Drivers\STM32F4xx_H
 		USB->CNTR |= USB_CNTR_FSUSP;
 		USB->ISTR &= ~USB_ISTR_SUSP;
 		USB->CNTR |= USB_CNTR_LPMODE;
-		dev_state = DeviceState::Suspended;
+		devState = DeviceState::Suspended;
 	}
 
 	/////////// 	400 		RESET: Reset Interrupt
@@ -325,7 +315,7 @@ void USBHandler::ActivateEndpoint(uint8_t endpoint, Direction direction, EndPoin
 	USB_EPR[endpoint].EPR = (USB_EPR[endpoint].EPR & USB_EP_T_MASK) | (endpoint | ep_type | USB_EP_CTR_RX | USB_EP_CTR_TX);
 
 	if (direction == Direction::in) {
-		USB_PMA[endpoint].ADDR_TX = pmaAddress;						// Offset of PMA used for EP0 TX
+		USB_PMA[endpoint].ADDR_TX = pmaAddress;						// Offset of PMA used for EP TX
 
 		// Clear tx data toggle (data packets must alternate 1 and 0 in the data field)
 		if ((USB_EPR[endpoint].EPR & USB_EP_DTOG_TX) != 0) {
@@ -336,7 +326,7 @@ void USBHandler::ActivateEndpoint(uint8_t endpoint, Direction direction, EndPoin
 		SetTxStatus(endpoint, USB_EP_TX_NAK);
 
 	} else {
-		USB_PMA[endpoint].ADDR_RX = pmaAddress;						// Offset of PMA used for EP0 RX
+		USB_PMA[endpoint].ADDR_RX = pmaAddress;						// Offset of PMA used for EP RX
 		USB_PMA[endpoint].COUNT_RX = (1 << USB_COUNT0_RX_BLSIZE_Pos) | (1 << USB_COUNT0_RX_NUM_BLOCK_Pos);		// configure block size = 1 (32 Bytes); number of blocks = 2 (64 bytes)
 
 		// Clear rx data toggle
@@ -353,7 +343,7 @@ void USBHandler::ActivateEndpoint(uint8_t endpoint, Direction direction, EndPoin
 
 void USBHandler::GetDescriptor()
 {
-	switch (static_cast<Descriptor>(req.Value >> 8))	{
+	switch (static_cast<Descriptor>(req.wValue >> 8))	{
 	case DeviceDescriptor:
 		txBuff = USBD_FS_DeviceDesc;
 		txBuffSize = sizeof(USBD_FS_DeviceDesc);
@@ -371,20 +361,21 @@ void USBHandler::GetDescriptor()
 
 	case StringDescriptor:
 
-		switch ((uint8_t)(req.Value)) {
-		case USBD_IDX_LANGID_STR:			// 300
+		switch ((uint8_t)(req.wValue)) {
+		case LangIDStrIndex:				// 300
 			txBuff = USBD_LangIDDesc;
 			txBuffSize = sizeof(USBD_LangIDDesc);
 			break;
-		case USBD_IDX_MFC_STR:				// 301
-			txBuffSize = GetString((uint8_t*)USBD_MANUFACTURER_STRING, USBD_StrDesc);
-			txBuff = USBD_StrDesc;
+
+		case MfcStrIndex:					// 301
+			StringToTxBuff(manufacturerString);
 			break;
-		case USBD_IDX_PRODUCT_STR:			// 302
-			txBuffSize = GetString((uint8_t*)USBD_PRODUCT_STRING, USBD_StrDesc);
-			txBuff = USBD_StrDesc;
+
+		case ProductStrIndex:				// 302
+			StringToTxBuff(productString);
 			break;
-		case USBD_IDX_SERIAL_STR:			// 303
+
+		case SerialStrIndex:				// 303
 			{
 				// STM32 unique device ID (96 bit number starting at UID_BASE)
 				uint32_t deviceserial0 = *(uint32_t*) UID_BASE;
@@ -406,9 +397,9 @@ void USBHandler::GetDescriptor()
 			txBuff = USBD_StrDesc;
 	      break;
 */
-	    case USBD_IDX_CDC_STR:				// 304
-			txBuffSize = GetString((uint8_t*)USBD_CDC_STRING, USBD_StrDesc);
-			txBuff = USBD_StrDesc;
+	    case CDCStrIndex:					// 304
+	    	StringToTxBuff(cdcString);
+
 	      break;
 
 		default:
@@ -422,31 +413,30 @@ void USBHandler::GetDescriptor()
 		return;
 	}
 
-	if ((txBuffSize != 0) && (req.Length != 0)) {
+	if ((txBuffSize != 0) && (req.wLength != 0)) {
 		txRemaining = txBuffSize;
-		txBuffSize = std::min(txBuffSize, static_cast<uint32_t>(req.Length));
+		txBuffSize = std::min(txBuffSize, static_cast<uint32_t>(req.wLength));
 		EPStartXfer(Direction::in, 0, txBuffSize);
 	}
 
-	if (req.Length == 0) {
+	if (req.wLength == 0) {
 		EPStartXfer(Direction::in, 0, 0);
 	}
 }
 
-
-uint32_t USBHandler::GetString(const uint8_t* desc, uint8_t *unicode)
+void USBHandler::StringToTxBuff(const char* desc)
 {
 	uint32_t idx = 2;
 
-	if (desc != nullptr) {
-		while (*desc != '\0') {
-			unicode[idx++] = *desc++;
-			unicode[idx++] = 0;
-		}
-		unicode[0] = idx;
-		unicode[1] = StringDescriptor;
+	while (*desc != '\0') {
+		unicodeString[idx++] = *desc++;
+		unicodeString[idx++] = 0;
 	}
-	return idx;
+	unicodeString[0] = idx;
+	unicodeString[1] = StringDescriptor;
+
+	txBuff = unicodeString;
+	txBuffSize = idx;
 }
 
 
@@ -482,7 +472,7 @@ bool USBHandler::ReadInterrupts(uint32_t interrupt)
 
 void USBHandler::SendData(const uint8_t* data, uint16_t len, uint8_t endpoint)
 {
-	if (dev_state == DeviceState::Configured) {
+	if (devState == DeviceState::Configured) {
 		if (!transmitting) {
 			transmitting = true;
 			txBuff = (uint8_t*)data;
@@ -523,8 +513,8 @@ void USBHandler::OutputDebug()
 		if ((usbDebug[evNo].Interrupt & USB_ISTR_CTR) == USB_ISTR_CTR) {
 			if ((usbDebug[evNo].Interrupt & USB_ISTR_DIR) == USB_ISTR_DIR) {
 				interrupt = "CTR_OUT";
-				if (usbDebug[evNo].Request.Request == 6) {
-					switch (static_cast<Descriptor>(usbDebug[evNo].Request.Value >> 8))	{
+				if (usbDebug[evNo].Request.bRequest == 6) {
+					switch (static_cast<Descriptor>(usbDebug[evNo].Request.wValue >> 8))	{
 					case DeviceDescriptor:
 						subtype = "Get Device Descriptor";
 						break;
@@ -537,20 +527,20 @@ void USBHandler::OutputDebug()
 
 					case StringDescriptor:
 
-						switch ((uint8_t)(usbDebug[evNo].Request.Value & 0xFF)) {
-						case USBD_IDX_LANGID_STR:			// 300
+						switch ((uint8_t)(usbDebug[evNo].Request.wValue & 0xFF)) {
+						case LangIDStrIndex:				// 300
 							subtype = "Get Lang Str Descriptor";
 							break;
-						case USBD_IDX_MFC_STR:				// 301
+						case MfcStrIndex:					// 301
 							subtype = "Get Manufacturor Str Descriptor";
 							break;
-						case USBD_IDX_PRODUCT_STR:			// 302
+						case ProductStrIndex:				// 302
 							subtype = "Get Product Str Descriptor";
 							break;
-						case USBD_IDX_SERIAL_STR:			// 303
+						case SerialStrIndex:				// 303
 							subtype = "Get Serial Str Descriptor";
 							break;
-					    case USBD_IDX_CDC_STR:				// 304
+					    case CDCStrIndex:					// 304
 							subtype = "Get CDC Str Descriptor";
 							break;
 						}
@@ -558,12 +548,12 @@ void USBHandler::OutputDebug()
 					default:
 						subtype = "Get Descriptor";
 					}
-				} else if (usbDebug[evNo].Request.Request == 5) {
-					subtype = "Set Address to " + std::to_string(usbDebug[evNo].Request.Value);
-				} else if (usbDebug[evNo].Request.Request == 9) {
+				} else if (usbDebug[evNo].Request.bRequest == 5) {
+					subtype = "Set Address to " + std::to_string(usbDebug[evNo].Request.wValue);
+				} else if (usbDebug[evNo].Request.bRequest == 9) {
 					subtype = "SET_CONFIGURATION";
-				} else if ((usbDebug[evNo].Request.mRequest & USB_REQ_TYPE_MASK) == RequestTypeClass) {
-					switch (usbDebug[evNo].Request.Request) {
+				} else if ((usbDebug[evNo].Request.bmRequest & USB_REQ_TYPE_MASK) == RequestTypeClass) {
+					switch (usbDebug[evNo].Request.bRequest) {
 					case 0x20:
 						subtype = "CDC: Set Line Coding";
 						break;
@@ -601,11 +591,11 @@ void USBHandler::OutputDebug()
 					+ HexToString(usbDebug[evNo].Interrupt, false) + ","
 					+ interrupt + "," + subtype + ","
 					+ std::to_string(usbDebug[evNo].endpoint) + ","
-					+ HexByte(usbDebug[evNo].Request.mRequest) + ","
-					+ HexByte(usbDebug[evNo].Request.Request) + ","
-					+ HexByte(usbDebug[evNo].Request.Value) + ","
-					+ HexByte(usbDebug[evNo].Request.Index) + ","
-					+ HexByte(usbDebug[evNo].Request.Length) + ","
+					+ HexByte(usbDebug[evNo].Request.bmRequest) + ","
+					+ HexByte(usbDebug[evNo].Request.bRequest) + ","
+					+ HexByte(usbDebug[evNo].Request.wValue) + ","
+					+ HexByte(usbDebug[evNo].Request.wIndex) + ","
+					+ HexByte(usbDebug[evNo].Request.wLength) + ","
 					+ HexByte(usbDebug[evNo].PacketSize) + ","
 					+ HexToString(usbDebug[evNo].xferBuff0, true) + " "
 					+ HexToString(usbDebug[evNo].xferBuff1, true) + "\n");
