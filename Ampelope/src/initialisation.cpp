@@ -40,22 +40,8 @@ void SystemClock_Config(void) {
 
 void InitSysTick()
 {
-//	// Register macros found in core_cm4.h
-//	SysTick->CTRL = 0;								// Disable SysTick
-//	SysTick->LOAD = 0xFFFF - 1;						// Set reload register to maximum 2^24 - each tick is around 400us
-//
-//	// Set priority of Systick interrupt to least urgency (ie largest priority value)
-//	NVIC_SetPriority (SysTick_IRQn, (1 << __NVIC_PRIO_BITS) - 1);
-//
-//	SysTick->VAL = 0;								// Reset the SysTick counter value
-//
-//	SysTick->CTRL |= SysTick_CTRL_CLKSOURCE_Msk;	// Select processor clock: 1 = processor clock; 0 = external clock
-//	SysTick->CTRL |= SysTick_CTRL_TICKINT_Msk;		// Enable SysTick interrupt
-//	SysTick->CTRL |= SysTick_CTRL_ENABLE_Msk;		// Enable SysTick
-
 	SysTick_Config(SystemCoreClock / SYSTICK);		// gives 1ms
 	NVIC_SetPriority(SysTick_IRQn, 0);
-
 }
 
 void InitDAC()
@@ -106,7 +92,7 @@ void InitIO()
 }
 
 
-//	Setup Timer 3 on an interrupt to trigger sample acquisition
+//	Setup Timer 3 on an interrupt to trigger sample output
 void InitEnvTimer() {
 	RCC->APB1ENR1 |= RCC_APB1ENR1_TIM3EN;			// Enable Timer 3
 	TIM3->PSC = 34;									// Set prescaler

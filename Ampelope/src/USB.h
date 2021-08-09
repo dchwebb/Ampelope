@@ -31,9 +31,9 @@ typedef struct {
 #define  USB_EPR  ((USB_EPR_TypeDef*)(&USB->EP0R))
 
 #define USB_REQ_RECIPIENT_MASK			0x03
-#define EP_ADDR_MASK					0x0F
 #define USB_REQ_DIRECTION_MASK			0x80
 #define USB_REQ_TYPE_MASK				0x60
+#define EP_ADDR_MASK					0x0F
 
 #define USBD_VID						0x483		// Vendor ID - use STMicro
 #define USBD_LANGID						1033		// Language - en-US
@@ -59,7 +59,7 @@ private:
 	static constexpr const char* productString      = "Mountjoy Ampelope";
 	static constexpr const char* cdcString          = "Mountjoy Ampelope CDC";
 
-	enum EndPoint {CDC_In = 0x81, CDC_Out = 0x1, CDC_Cmd = 0x82, };
+	enum EndPoint {CDC_In = 0x81, CDC_Out = 0x1, CDC_Cmd = 0x82};
 	enum EndPointType {Control = 0, Isochronous = 1, Bulk = 2, Interrupt = 3};
 	enum Descriptor {DeviceDescriptor = 0x1, ConfigurationDescriptor = 0x2, StringDescriptor = 0x3, InterfaceDescriptor = 0x4, EndpointDescriptor = 0x5, DeviceQualifierDescriptor = 0x6, IadDescriptor = 0xb, BosDescriptor = 0xF};
 	enum RequestRecipient {RequestRecipientDevice = 0x0, RequestRecipientInterface = 0x1, RequestRecipientEndpoint = 0x2};
