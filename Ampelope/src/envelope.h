@@ -6,7 +6,7 @@ struct Envelope {
 public:
 	uint16_t attack = 800;
 	uint16_t decay = 600;
-	uint16_t sustain = 2000;
+	uint16_t sustain = 2048;
 	uint16_t release = 2400;
 	float currentLevel = 0;
 
