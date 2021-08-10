@@ -1,7 +1,20 @@
 #include "envelope.h"
 #include <cmath>
+#include <ctgmath>
 
-uint16_t Envelope::calcEnvelope() {
+// Gives maximum error of 0.1 / 1.24 (ie 8%)
+float fastPow(float a, float b)
+{
+    union {
+        float    f;
+        uint32_t u;
+    } temp;
+    temp.f = a;
+    temp.u = (uint32_t)(b * (float)(temp.u - 1064866808) + 1064866808);
+    return temp.f;
+}
+
+void Envelope::calcEnvelope() {
 	// Gate on
 	if ((GPIOC->IDR & GPIO_IDR_ID8) == 0) {
 		attack = ADC_array[0];
@@ -20,31 +33,38 @@ uint16_t Envelope::calcEnvelope() {
 			const float fullRange = 5000.0f;
 
 			// scales attack pot to allow more range at low end of pot, exponentially longer times at upper end
-			// higher values give shorter attack times at lower pot values
-			const float attackScale = 2.4f;			// 2.4 = approx setting for long times
-			const float maxDurationMult = 1.25f;	// to scale maximum delay time - 1.25 for long times
-			//const float maxDurationMult = 0.15f;	// to scale maximum delay time - 0.15 for short times
+			const float attackScale = 2.9f;			// higher values give shorter attack times at lower pot values
+			const float maxDurationMult = longTimes ? 4.45f : 0.52;	// to scale maximum delay time
 			const float timeStep = 1.0f / 48000.0f;	// one time unit - corresponding to sample time
 
 			// RC value - attackScale represents R component; maxDurationMult represents capacitor size
-			float rc = std::pow((float)attack / 4096.f, attackScale) * maxDurationMult;		// Reduce rc for a steeper curve
-			float xPos = -rc * std::log(1.f - (currentLevel / fullRange));		// Invert capacitor equation to calculate current 'time' based on y/voltage value
-			float newXPos = xPos + timeStep;
-			float newYPos = 1.0f - std::pow(M_E, -newXPos / rc);		// Capacitor charging equation
 
-			currentLevel = newYPos * fullRange;
+			//GPIOC->ODR |= GPIO_IDR_ID6;
+			rc = std::pow(static_cast<float>(attack) / 4096.f, attackScale) * maxDurationMult;		// Reduce rc for a steeper curve
+			//GPIOC->ODR &= ~GPIO_ODR_ODR_6;
+
+			if (rc != 0.0f) {
+				float xPos = -rc * std::log(1.f - (currentLevel / fullRange));		// Invert capacitor equation to calculate current 'time' based on y/voltage value
+				float newXPos = xPos + timeStep;
+				exponent = -newXPos / rc;
+				float newYPos = 1.0f - std::exp(exponent);		// Capacitor charging equation
+				currentLevel = newYPos * fullRange;
+			} else {
+				currentLevel = fullRange;
+			}
+
 			if (currentLevel >= 4095.0f) {
 				currentLevel = 4095.0f;
 				gateState = gateStates::decay;
 			}
 			break;
+
 		}
 		case gateStates::decay: {
 			// Capacitor discharge equation: Vc = Vo * e ^ -t/RC
-
+			float newYPos = 0.0f;
 			// scales decay pot to allow more range at low end of pot, exponentially longer times at upper end
-			// higher values give shorter attack times at lower pot values
-			const float decayScale = 2.4f;			// 2.4 = approx setting for long times
+			const float decayScale = 2.4f;			// higher values give shorter attack times at lower pot values
 			const float maxDurationMult = 5.0f;		// to scale maximum delay time
 			//const float maxDurationMult = 0.3f;	// to scale maximum delay time - 0.3 for short times
 			const float timeStep = 1.0f / 48000.0f;	// one time unit - corresponding to sample time
@@ -52,11 +72,12 @@ uint16_t Envelope::calcEnvelope() {
 			float yHeight = 4096.0f - sustain;		// Height of decay curve
 
 			// RC value - decayScale represents R component; maxDurationMult represents capacitor size
-			float rc = std::pow((float)decay / 4096.0f, decayScale) * maxDurationMult;
-			float xPos = -rc * std::log((currentLevel - sustain) / yHeight);		// Invert capacitor discharge equation to calculate current 'time' based on y/voltage value
-			float newXPos = xPos + timeStep;
-			float newYPos = std::pow(M_E, -newXPos / rc);		// Capacitor discharging equation
-
+			rc = std::pow((float)decay / 4096.0f, decayScale) * maxDurationMult;
+			if (rc != 0.0f) {
+				float xPos = -rc * std::log((currentLevel - sustain) / yHeight);		// Invert capacitor discharge equation to calculate current 'time' based on y/voltage value
+				float newXPos = xPos + timeStep;
+				newYPos = std::exp(-newXPos / rc);		// Capacitor discharging equation
+			}
 			currentLevel = (newYPos * yHeight) + sustain;
 			if (currentLevel < sustain) {
 				currentLevel = sustain;

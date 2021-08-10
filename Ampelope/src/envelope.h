@@ -8,7 +8,12 @@ public:
 	uint16_t decay = 600;
 	uint16_t sustain = 2048;
 	uint16_t release = 2400;
-	float currentLevel = 0;
+	float currentLevel = 0.0f;
+	float exponent = 0.0f;	// breakout variables for debug
+	float powErr = 0.0f;
+	float rc = 0.0f;
+
+	bool longTimes = true;
 
 	uint16_t attackCount;
 	uint16_t decayCount;
@@ -17,5 +22,5 @@ public:
 	enum class gateStates {off, attack, decay, sustain, release};
 	gateStates gateState = gateStates::off;
 
-	uint16_t calcEnvelope();
+	void calcEnvelope();
 };
