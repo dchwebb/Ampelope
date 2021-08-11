@@ -96,7 +96,7 @@ void InitIO()
 void InitEnvTimer() {
 	RCC->APB1ENR1 |= RCC_APB1ENR1_TIM3EN;			// Enable Timer 3
 	TIM3->PSC = 34;									// Set prescaler
-	TIM3->ARR = 103; 								// Set auto reload register
+	TIM3->ARR = 103; 								// Set auto reload register - 170Mhz / 33 / 103 = ~50kHz
 
 	TIM3->DIER |= TIM_DIER_UIE;						// DMA/interrupt enable register
 	NVIC_EnableIRQ(TIM3_IRQn);

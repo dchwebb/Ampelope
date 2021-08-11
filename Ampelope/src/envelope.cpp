@@ -14,6 +14,9 @@ float fastPow(float a, float b)
     return temp.f;
 }
 
+// fixme
+// Decay to sustain
+
 void Envelope::calcEnvelope() {
 	// Gate on
 	if ((GPIOC->IDR & GPIO_IDR_ID8) == 0) {
@@ -34,7 +37,8 @@ void Envelope::calcEnvelope() {
 
 			// scales attack pot to allow more range at low end of pot, exponentially longer times at upper end
 			const float attackScale = 2.9f;			// higher values give shorter attack times at lower pot values
-			const float maxDurationMult = longTimes ? 4.45f : 0.52;	// to scale maximum delay time
+			float maxDurationMult = (longTimes ? 7.7f : 0.9f) / 1.73;		// 1.73 allows duration to be set in seconds
+			//const float maxDurationMult = longTimes ? 4.45f : 0.52;	// to scale maximum delay time
 			const float timeStep = 1.0f / 48000.0f;	// one time unit - corresponding to sample time
 
 			// RC value - attackScale represents R component; maxDurationMult represents capacitor size
@@ -65,8 +69,7 @@ void Envelope::calcEnvelope() {
 			float newYPos = 0.0f;
 			// scales decay pot to allow more range at low end of pot, exponentially longer times at upper end
 			const float decayScale = 2.4f;			// higher values give shorter attack times at lower pot values
-			const float maxDurationMult = 5.0f;		// to scale maximum delay time
-			//const float maxDurationMult = 0.3f;	// to scale maximum delay time - 0.3 for short times
+			const float maxDurationMult = longTimes ? 5.0f : 0.3f;		// to scale maximum delay time
 			const float timeStep = 1.0f / 48000.0f;	// one time unit - corresponding to sample time
 
 			float yHeight = 4096.0f - sustain;		// Height of decay curve

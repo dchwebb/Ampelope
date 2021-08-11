@@ -44,7 +44,9 @@ int main(void)
 
 		if ((GPIOC->IDR & GPIO_IDR_ID13) != 0 && SysTickVal > buttonDebounce + 1000) {
 			buttonDebounce = SysTickVal;
+#if (USB_DEBUG)
 			usb.OutputDebug();
+#endif
 			//uartSendString("hello");
 
 		}
