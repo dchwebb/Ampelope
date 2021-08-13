@@ -14,14 +14,14 @@ float fastPow(float a, float b)
     return temp.f;
 }
 
-// fixme
-// Decay to sustain
+// Capacitor charging equation: Vc = Vs(1 - e ^ -t/RC)
+// Capacitor discharge equation: Vc = Vo * e ^ -t/RC
+
+
 
 void Envelope::calcEnvelope() {
 	// Gate on
 	if ((GPIOC->IDR & GPIO_IDR_ID8) == 0) {
-		attack = ADC_array[0];
-		decay = ADC_array[1];
 
 		switch (gateState) {
 		case gateStates::off:
@@ -30,7 +30,8 @@ void Envelope::calcEnvelope() {
 			break;
 
 		case gateStates::attack: {
-			// Capacitor charging equation: Vc = Vs(1 - e ^ -t/RC)
+
+			attack = std::max((int)ADC_array[0], 200);
 
 			// fullRange = value of fully charged capacitor; comparitor value is 4096 where cap is charged enough to trigger decay phase
 			const float fullRange = 5000.0f;
@@ -38,11 +39,8 @@ void Envelope::calcEnvelope() {
 			// scales attack pot to allow more range at low end of pot, exponentially longer times at upper end
 			const float attackScale = 2.9f;			// higher values give shorter attack times at lower pot values
 			float maxDurationMult = (longTimes ? 7.7f : 0.9f) / 1.73;		// 1.73 allows duration to be set in seconds
-			//const float maxDurationMult = longTimes ? 4.45f : 0.52;	// to scale maximum delay time
-			const float timeStep = 1.0f / 48000.0f;	// one time unit - corresponding to sample time
 
 			// RC value - attackScale represents R component; maxDurationMult represents capacitor size
-
 			//GPIOC->ODR |= GPIO_IDR_ID6;
 			rc = std::pow(static_cast<float>(attack) / 4096.f, attackScale) * maxDurationMult;		// Reduce rc for a steeper curve
 			//GPIOC->ODR &= ~GPIO_ODR_ODR_6;
@@ -65,24 +63,24 @@ void Envelope::calcEnvelope() {
 
 		}
 		case gateStates::decay: {
-			// Capacitor discharge equation: Vc = Vo * e ^ -t/RC
-			float newYPos = 0.0f;
 			// scales decay pot to allow more range at low end of pot, exponentially longer times at upper end
 			const float decayScale = 2.4f;			// higher values give shorter attack times at lower pot values
-			const float maxDurationMult = longTimes ? 5.0f : 0.3f;		// to scale maximum delay time
-			const float timeStep = 1.0f / 48000.0f;	// one time unit - corresponding to sample time
+			float maxDurationMult = (longTimes ? 44.0f : 5.28f) / 4.4;		// to scale maximum delay time
 
 			float yHeight = 4096.0f - sustain;		// Height of decay curve
 
 			// RC value - decayScale represents R component; maxDurationMult represents capacitor size
-			rc = std::pow((float)decay / 4096.0f, decayScale) * maxDurationMult;
+			rc = std::pow(static_cast<float>(decay) / 4096.0f, decayScale) * maxDurationMult;
 			if (rc != 0.0f) {
 				float xPos = -rc * std::log((currentLevel - sustain) / yHeight);		// Invert capacitor discharge equation to calculate current 'time' based on y/voltage value
 				float newXPos = xPos + timeStep;
-				newYPos = std::exp(-newXPos / rc);		// Capacitor discharging equation
+				float newYPos = std::exp(-newXPos / rc);		// Capacitor discharging equation
+				currentLevel = (newYPos * yHeight) + sustain;
+			} else {
+				currentLevel = 0.0f;
 			}
-			currentLevel = (newYPos * yHeight) + sustain;
-			if (currentLevel < sustain) {
+
+			if (currentLevel <= sustain + 1.5f) {			// add a little extra to avoid getting stuck in infinitely small decrease
 				currentLevel = sustain;
 				gateState = gateStates::sustain;
 			}
@@ -97,12 +95,29 @@ void Envelope::calcEnvelope() {
 
 	} else {
 		if (currentLevel > 0) {
-			float yPos = currentLevel / 4096.f;		// position in decay curve normalised to 0-1 range
-			float xStep = 1.f / std::max(static_cast<float>(release), 1.f);
+			release = ADC_array[1];
 
-			float newYPos = std::pow(std::pow(yPos, 0.2f) - xStep, 5.f);
+//			float yPos = currentLevel / 4096.f;		// position in decay curve normalised to 0-1 range
+//			float xStep = 1.f / std::max(static_cast<float>(release), 1.f);
+//
+//			float newYPos = std::pow(std::pow(yPos, 0.2f) - xStep, 5.f);
+//
+//			currentLevel = (newYPos * 4096.f);
 
-			currentLevel = (newYPos * 4096.f);
+			const float releaseScale = 2.4f;			// higher values give shorter attack times at lower pot values
+			float maxDurationMult = (longTimes ? 44.0f : 5.2f) / 1.3;		// to scale maximum delay time
+
+			// RC value - decayScale represents R component; maxDurationMult represents capacitor size
+			rc = std::pow(static_cast<float>(release) / 4096.0f, releaseScale) * maxDurationMult;
+			if (rc != 0.0f) {
+				float xPos = -rc * std::log(currentLevel / 4096.0f);		// Invert capacitor discharge equation to calculate current 'time' based on y/voltage value
+				float newXPos = xPos + timeStep;
+				float newYPos = std::exp(-newXPos / rc);		// Capacitor discharging equation
+				currentLevel = newYPos * 4096.0f;
+			} else {
+				currentLevel = 0.0f;
+			}
+
 
 		}
 		gateState = gateStates::off;

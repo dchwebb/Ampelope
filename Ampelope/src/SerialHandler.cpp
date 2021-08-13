@@ -1,7 +1,9 @@
 #include "SerialHandler.h"
+#include "Envelope.h"
 
 #include <stdio.h>
 
+extern Envelope envelope;
 
 int32_t SerialHandler::ParseInt(const std::string cmd, const char precedingChar, int low = 0, int high = 0) {
 	int32_t val = -1;
@@ -42,7 +44,7 @@ SerialHandler::SerialHandler(USBHandler& usbObj)
 // Check if a command has been received from USB, parse and action as required
 bool SerialHandler::Command()
 {
-	char buf[50];
+	//char buf[50];
 
 	if (!CmdPending) {
 		return false;
@@ -62,14 +64,15 @@ bool SerialHandler::Command()
 
 	} else if (ComCmd.compare("info\n") == 0) {		// Print diagnostic information
 
-		usb->SendString("Mountjoy Alligator v1.0 - Current Settings:\r\n\r\n");
+		usb->SendString("Mountjoy Ampelope v1.0 - Current Settings:\r\n\r\n"
+				"Envelope Times:" + std::string(envelope.longTimes ? "long" : "short") + "\r\n");
 
 	} else if (ComCmd.compare("help\n") == 0) {
 
-		usb->SendString("Mountjoy Alligator\r\n"
+		usb->SendString("Mountjoy Ampelope\r\n"
 				"\r\nSupported commands:\r\n"
 				"info        -  Show diagnostic information\r\n"
-
+				"l/s         -  Long or Short envelope times\r\n"
 				"\r\n"
 #if (USB_DEBUG)
 				"usbdebug    -  Start USB debugging\r\n"
@@ -82,15 +85,13 @@ bool SerialHandler::Command()
 		USBDebug = true;
 		usb->SendString("Press link button to dump output\r\n");
 #endif
-/*
-	} else if (ComCmd.compare("gateled\n") == 0) {				// Configure gate LED
-		delay.gateLED = !delay.gateLED;
-		usb->SendString("Toggle Filter LED displaying gate status\r\n");
-		if (!delay.gateLED) {
-			filter.Update(true);
-		}
 
-	} else if (ComCmd.compare(0, 9, "mdlength:") == 0) {		// Modulated Delay length
+	} else if (ComCmd.compare("l\n") == 0) {				// Long envelope times
+		envelope.longTimes = true;
+	} else if (ComCmd.compare("s\n") == 0) {				// Short envelope times
+		envelope.longTimes = false;
+
+/*	} else if (ComCmd.compare(0, 9, "mdlength:") == 0) {		// Modulated Delay length
 		uint16_t val = ParseInt(ComCmd, ':', 1, 65535);
 		if (val > 0) {
 			delay.modOffsetMax = val;

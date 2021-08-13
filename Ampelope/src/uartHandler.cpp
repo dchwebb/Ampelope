@@ -49,25 +49,15 @@ std::string HexToString(const uint32_t& v, const bool& spaces) {
 	char buf[20];
 	if (spaces) {
 		if (v != 0) {
-			sprintf(buf, "%02X %02X %02X %02X", v & 0xFF, (v >> 8) & 0xFF, (v >> 16) & 0xFF, (v >> 24) & 0xFF);
+			sprintf(buf, "%02luX %02luX %02luX %02luX", v & 0xFF, (v >> 8) & 0xFF, (v >> 16) & 0xFF, (v >> 24) & 0xFF);
 		} else {
-			sprintf(buf, "");
+			sprintf(buf, " ");
 		}
 	} else {
-		sprintf(buf, "%X", v);
+		sprintf(buf, "%luX", v);
 	}
 	return std::string(buf);
-//	std::string(buf).append("\r\n")
 
-	/*
-	std::stringstream ss;
-	ss << std::uppercase << std::setfill('0') << std::setw(8) << std::hex << v;
-	if (spaces) {
-		//std::string s = ss.str();
-		return ss.str().insert(2, " ").insert(5, " ").insert(8, " ");
-	}
-	return ss.str();
-	*/
 }
 
 std::string HexByte(const uint16_t& v) {
@@ -75,9 +65,6 @@ std::string HexByte(const uint16_t& v) {
 	sprintf(buf, "%X", v);
 	return std::string(buf);
 
-//	std::stringstream ss;
-//	ss << std::uppercase << std::setfill('0') << std::setw(2) << std::hex << v;
-//	return ss.str();
 }
 
 void uartSendChar(char c) {
