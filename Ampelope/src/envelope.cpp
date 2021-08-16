@@ -31,7 +31,7 @@ void Envelope::calcEnvelope() {
 
 		case gateStates::attack: {
 
-			attack = std::max((int)ADC_array[0], 200);
+			attack = std::max((int)ADC_array[ADC_Attack], 200);
 
 			// fullRange = value of fully charged capacitor; comparitor value is 4096 where cap is charged enough to trigger decay phase
 			const float fullRange = 5000.0f;
@@ -62,7 +62,10 @@ void Envelope::calcEnvelope() {
 			break;
 
 		}
+
 		case gateStates::decay: {
+			decay = ADC_array[ADC_Decay];
+
 			// scales decay pot to allow more range at low end of pot, exponentially longer times at upper end
 			const float decayScale = 2.4f;			// higher values give shorter attack times at lower pot values
 			float maxDurationMult = (longTimes ? 44.0f : 5.28f) / 4.4;		// to scale maximum delay time
@@ -72,7 +75,7 @@ void Envelope::calcEnvelope() {
 			// RC value - decayScale represents R component; maxDurationMult represents capacitor size
 			rc = std::pow(static_cast<float>(decay) / 4096.0f, decayScale) * maxDurationMult;
 			if (rc != 0.0f) {
-				float xPos = -rc * std::log((currentLevel - sustain) / yHeight);		// Invert capacitor discharge equation to calculate current 'time' based on y/voltage value
+				float xPos = -rc * std::log((currentLevel - sustain) / yHeight);		// Invert capacitor discharge equation to calculate current 'time' based on y/voltage
 				float newXPos = xPos + timeStep;
 				float newYPos = std::exp(-newXPos / rc);		// Capacitor discharging equation
 				currentLevel = (newYPos * yHeight) + sustain;
@@ -80,7 +83,8 @@ void Envelope::calcEnvelope() {
 				currentLevel = 0.0f;
 			}
 
-			if (currentLevel <= sustain + 1.5f) {			// add a little extra to avoid getting stuck in infinitely small decrease
+			if (currentLevel <= sustain + 1.5f) {				// add a little extra to avoid getting stuck in infinitely small decrease
+				sustain = ADC_array[ADC_Sustain];
 				currentLevel = sustain;
 				gateState = gateStates::sustain;
 			}
@@ -89,20 +93,14 @@ void Envelope::calcEnvelope() {
 		case gateStates::sustain:
 			currentLevel = sustain;
 			break;
+
 		case gateStates::release:
 			break;
 		}
 
 	} else {
 		if (currentLevel > 0) {
-			release = ADC_array[1];
-
-//			float yPos = currentLevel / 4096.f;		// position in decay curve normalised to 0-1 range
-//			float xStep = 1.f / std::max(static_cast<float>(release), 1.f);
-//
-//			float newYPos = std::pow(std::pow(yPos, 0.2f) - xStep, 5.f);
-//
-//			currentLevel = (newYPos * 4096.f);
+			release = ADC_array[ADC_Release];
 
 			const float releaseScale = 2.4f;			// higher values give shorter attack times at lower pot values
 			float maxDurationMult = (longTimes ? 44.0f : 5.2f) / 1.3;		// to scale maximum delay time
@@ -110,14 +108,13 @@ void Envelope::calcEnvelope() {
 			// RC value - decayScale represents R component; maxDurationMult represents capacitor size
 			rc = std::pow(static_cast<float>(release) / 4096.0f, releaseScale) * maxDurationMult;
 			if (rc != 0.0f) {
-				float xPos = -rc * std::log(currentLevel / 4096.0f);		// Invert capacitor discharge equation to calculate current 'time' based on y/voltage value
+				float xPos = -rc * std::log(currentLevel / 4096.0f);
 				float newXPos = xPos + timeStep;
-				float newYPos = std::exp(-newXPos / rc);		// Capacitor discharging equation
+				float newYPos = std::exp(-newXPos / rc);
 				currentLevel = newYPos * 4096.0f;
 			} else {
 				currentLevel = 0.0f;
 			}
-
 
 		}
 		gateState = gateStates::off;

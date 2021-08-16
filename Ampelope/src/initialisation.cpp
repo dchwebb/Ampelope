@@ -180,34 +180,32 @@ void InitADC()
 
 	/*--------------------------------------------------------------------------------------------
 	Configure ADC Channels to be converted:
-	0	PC0 ADC12_IN6		Attack
-	1	PC1 ADC12_IN7		Decay
+	0	PC0 ADC12_IN6		Env1 Attack
+	1	PC1 ADC12_IN7		Env1 Decay
+	2	PC2 ADC12_IN8		Env1 Sustain
+	3	PC3 ADC12_IN9		Env1 Release
 
-	PC0 ADC12_IN6
-	PC1 ADC12_IN7
-	PC2 ADC12_IN8
-	PC3 ADC12_IN9
-	PA0 ADC12_IN1
-	PA1 ADC12_IN2
-	[PA2 ADC1_IN3 DAC]
-	PA3 ADC1_IN4
-	[PA4 ADC2_IN17 DAC]
-	[PA5 ADC2_IN13 DAC]
-	PA6 ADC2_IN3
-	PA7 ADC2_IN4
-	PC4 ADC2_IN5
-	PC5 ADC2_IN11
-	PB0 ADC1_IN15
-	[PB1 ADC1_IN12 DAC]
-	PB2 ADC2_IN12
+	PA0  ADC12_IN1
+	PA1  ADC12_IN2
+	PA3  ADC1_IN4
+	PA6  ADC2_IN3
+	PA7  ADC2_IN4
+	PC4  ADC2_IN5
+	PC5  ADC2_IN11
+	PB0  ADC1_IN15
+	PB2  ADC2_IN12
 	PB11 ADC12_IN14
 	PB12 ADC1_IN11
 	PB14 ADC1_IN5
 	PB15 ADC2_IN15
 
-
+	[PA2 ADC1_IN3 DAC]
+	[PA4 ADC2_IN17 DAC]
+	[PA5 ADC2_IN13 DAC]
+	[PB1 ADC1_IN12 DAC]
 	*/
-	InitAdcPins(ADC1, {6, 7});
+
+	InitAdcPins(ADC1, {6, 7, 8, 9});
 
 
 	// Enable ADC
