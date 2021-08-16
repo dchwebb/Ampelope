@@ -23,6 +23,8 @@ void Envelope::calcEnvelope() {
 	// Gate on
 	if ((GPIOC->IDR & GPIO_IDR_ID8) == 0) {
 
+		sustain = ADC_array[ADC_Sustain];
+
 		switch (gateState) {
 		case gateStates::off:
 			//currentLevel = 0;
@@ -84,7 +86,6 @@ void Envelope::calcEnvelope() {
 			}
 
 			if (currentLevel <= sustain + 1.5f) {				// add a little extra to avoid getting stuck in infinitely small decrease
-				sustain = ADC_array[ADC_Sustain];
 				currentLevel = sustain;
 				gateState = gateStates::sustain;
 			}
@@ -119,5 +120,5 @@ void Envelope::calcEnvelope() {
 		}
 		gateState = gateStates::off;
 	}
-	DAC1->DHR12R1 = static_cast<uint32_t>(currentLevel);
+	DAC1->DHR12R1 = static_cast<uint32_t>(4095.0f - currentLevel);
 }
