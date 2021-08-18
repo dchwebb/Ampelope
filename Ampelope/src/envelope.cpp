@@ -20,6 +20,10 @@ float fastPow(float a, float b)
 
 
 void Envelope::calcEnvelope() {
+
+	CORDIC->WDATA = cordic_inc;		// This should be a value between -1 and 1 in q1.31 format, relating to -pi to +pi
+	cordic_inc += 200000;
+
 	// Gate on
 	if ((GPIOC->IDR & GPIO_IDR_ID8) == 0) {
 
@@ -56,6 +60,9 @@ void Envelope::calcEnvelope() {
 			} else {
 				currentLevel = fullRange;
 			}
+			if (std::isnan(currentLevel)) {
+				int susp = 1;
+			}
 
 			if (currentLevel >= 4095.0f) {
 				currentLevel = 4095.0f;
@@ -76,14 +83,19 @@ void Envelope::calcEnvelope() {
 
 			// RC value - decayScale represents R component; maxDurationMult represents capacitor size
 			rc = std::pow(static_cast<float>(decay) / 4096.0f, decayScale) * maxDurationMult;
-			if (rc != 0.0f) {
+			if (rc != 0.0f && currentLevel > sustain) {
 				float xPos = -rc * std::log((currentLevel - sustain) / yHeight);		// Invert capacitor discharge equation to calculate current 'time' based on y/voltage
+				if (std::isnan(xPos)) {
+					int susp = 1;
+				}
 				float newXPos = xPos + timeStep;
 				float newYPos = std::exp(-newXPos / rc);		// Capacitor discharging equation
 				currentLevel = (newYPos * yHeight) + sustain;
+
 			} else {
 				currentLevel = 0.0f;
 			}
+
 
 			if (currentLevel <= sustain + 1.5f) {				// add a little extra to avoid getting stuck in infinitely small decrease
 				currentLevel = sustain;
@@ -120,5 +132,13 @@ void Envelope::calcEnvelope() {
 		}
 		gateState = gateStates::off;
 	}
-	DAC1->DHR12R1 = static_cast<uint32_t>(4095.0f - currentLevel);
+
+	//DAC1->DHR12R1 = static_cast<uint32_t>(4095.0f - currentLevel);
+
+	if (CORDIC->CSR & CORDIC_CSR_RRDY) {
+		cordic_sin = static_cast<float>(static_cast<int32_t>(CORDIC->RDATA)) / 4294967295.0f + 0.5f;
+
+		DAC1->DHR12R1 = static_cast<uint32_t>((4095.0f - currentLevel * cordic_sin));
+
+	}
 }

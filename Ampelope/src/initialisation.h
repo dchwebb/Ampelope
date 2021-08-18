@@ -26,7 +26,7 @@ void InitIO();
 void InitEnvTimer();
 void InitADC();
 void InitUart();
-
+void InitCordic();
 /*
 void InitCoverageTimer();
 void InitDebounceTimer();

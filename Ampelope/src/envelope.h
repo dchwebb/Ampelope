@@ -12,7 +12,8 @@ public:
 	float exponent = 0.0f;	// breakout variables for debug
 	float powErr = 0.0f;
 	float rc = 0.0f;
-
+	int32_t cordic_inc = 0;
+	float cordic_sin = 0;
 	bool longTimes = true;
 
 	const float timeStep = 1.0f / SAMPLERATE;	// one time unit - corresponding to sample time

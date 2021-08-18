@@ -29,6 +29,7 @@ int main(void)
 	InitEnvTimer();
 	InitADC();
 	InitUart();
+	InitCordic();
 
 	usb.InitUSB();
 
