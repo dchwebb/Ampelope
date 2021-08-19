@@ -2,6 +2,7 @@
 #include "Envelope.h"
 
 #include <stdio.h>
+#include <cmath>		// for cordic test
 
 extern Envelope envelope;
 
@@ -86,10 +87,40 @@ bool SerialHandler::Command()
 		usb->SendString("Press link button to dump output\r\n");
 #endif
 
+	} else if (ComCmd.compare("lfo\n") == 0) {				// LFO on/off
+		envelope.lfo = !envelope.lfo;
+		usb->SendString("LFO " + std::string(envelope.lfo ? "on" : "off") + "\r\n");
+
 	} else if (ComCmd.compare("l\n") == 0) {				// Long envelope times
 		envelope.longTimes = true;
+
 	} else if (ComCmd.compare("s\n") == 0) {				// Short envelope times
 		envelope.longTimes = false;
+
+	} else if (ComCmd.compare("cordic\n") == 0) {			// Cordic Test
+		TIM3->CR1 |= TIM_CR1_CEN;		// Disable timer interrupt
+
+		int32_t cordic_inc = 0;
+		volatile int32_t cordic_sin;
+
+		GPIOC->ODR |= GPIO_IDR_ID6;
+		for (int i = 0; i < 100000; ++i) {
+			CORDIC->WDATA = cordic_inc;
+			cordic_inc += 200000;
+
+			while ((CORDIC->CSR & CORDIC_CSR_RRDY) == 0);
+			cordic_sin = CORDIC->RDATA;
+		}
+		GPIOC->ODR &= ~GPIO_ODR_ODR_6;
+
+		for (int i = 0; i < 100000; ++i) {
+			cordic_inc += 200000;
+
+			cordic_sin = std::sin(cordic_inc);
+		}
+		GPIOC->ODR |= GPIO_IDR_ID6;
+
+		TIM3->CR1 |= TIM_CR1_CEN;							// Re-enable timer interrupt
 
 /*	} else if (ComCmd.compare(0, 9, "mdlength:") == 0) {		// Modulated Delay length
 		uint16_t val = ParseInt(ComCmd, ':', 1, 65535);

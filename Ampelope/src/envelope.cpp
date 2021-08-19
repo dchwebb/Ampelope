@@ -22,7 +22,7 @@ float fastPow(float a, float b)
 void Envelope::calcEnvelope() {
 
 	CORDIC->WDATA = cordic_inc;		// This should be a value between -1 and 1 in q1.31 format, relating to -pi to +pi
-	cordic_inc += 200000;
+	cordic_inc += ADC_array[ADC_Release] * 200;
 
 	// Gate on
 	if ((GPIOC->IDR & GPIO_IDR_ID8) == 0) {
@@ -113,7 +113,7 @@ void Envelope::calcEnvelope() {
 
 	} else {
 		if (currentLevel > 0) {
-			release = ADC_array[ADC_Release];
+			//release = ADC_array[ADC_Release];
 
 			const float releaseScale = 2.4f;			// higher values give shorter attack times at lower pot values
 			float maxDurationMult = (longTimes ? 44.0f : 5.2f) / 1.3;		// to scale maximum delay time
@@ -133,12 +133,14 @@ void Envelope::calcEnvelope() {
 		gateState = gateStates::off;
 	}
 
-	//DAC1->DHR12R1 = static_cast<uint32_t>(4095.0f - currentLevel);
-
-	if (CORDIC->CSR & CORDIC_CSR_RRDY) {
-		cordic_sin = static_cast<float>(static_cast<int32_t>(CORDIC->RDATA)) / 4294967295.0f + 0.5f;
-
-		DAC1->DHR12R1 = static_cast<uint32_t>((4095.0f - currentLevel * cordic_sin));
-
+	if (lfo) {
+		if (CORDIC->CSR & CORDIC_CSR_RRDY) {
+			cordic_sin = static_cast<float>(static_cast<int32_t>(CORDIC->RDATA)) / 4294967295.0f + 0.5f;
+			DAC1->DHR12R1 = static_cast<uint32_t>((4095.0f - currentLevel * cordic_sin));
+		}
+	} else {
+		DAC1->DHR12R1 = static_cast<uint32_t>(4095.0f - currentLevel);
 	}
+
+
 }

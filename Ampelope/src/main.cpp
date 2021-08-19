@@ -4,6 +4,8 @@
 #include "uartHandler.h"
 #include "SerialHandler.h"
 
+// FIXME - add transistor to start VCA in off position
+
 volatile uint32_t SysTickVal;
 volatile uint16_t ADC_array[ADC_BUFFER_LENGTH];
 
