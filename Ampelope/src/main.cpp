@@ -3,7 +3,7 @@
 #include "usb.h"
 #include "uartHandler.h"
 #include "SerialHandler.h"
-
+#include <cmath>
 // FIXME - add transistor to start VCA in off position
 
 volatile uint32_t SysTickVal;
@@ -17,6 +17,17 @@ SerialHandler serial(usb);
 
 extern "C" {
 #include "interrupts.h"
+}
+
+
+float expArray[EXP_LOOKUP_SIZE];
+void expLookup() {
+	const float max = 0.0f;		// -1.3704644E-5
+	const float min = EXP_LOOKUP_MIN;
+	const float inc = (max - min) / static_cast<float>(EXP_LOOKUP_SIZE);
+	for (int i = 0; i < EXP_LOOKUP_SIZE; ++i) {
+		expArray[i] = std::exp(min + (inc * static_cast<float>(i)));
+	}
 }
 
 extern uint32_t SystemCoreClock;
@@ -34,6 +45,7 @@ int main(void)
 	InitCordic();
 
 	usb.InitUSB();
+	expLookup();
 
 	while (1)
 	{

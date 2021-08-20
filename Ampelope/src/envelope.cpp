@@ -14,10 +14,35 @@ float fastPow(float a, float b)
     return temp.f;
 }
 
+
+
+extern float expArray[EXP_LOOKUP_SIZE];
+float expApprox(float p) {
+
+	const float max = 0.0f;		// -1.3704644E-5
+	const float min = -1.7370017f;
+	const float inc = (max - min) / static_cast<float>(EXP_LOOKUP_SIZE);
+
+	float pos = (p - min) / inc;
+
+	if (pos >= EXP_LOOKUP_SIZE - 1) {
+		return 1.0f;
+	}
+	if (pos < 0.0) {
+		return expArray[0];
+	}
+
+	float low = expArray[static_cast<uint16_t>(pos)];
+	float high = expArray[static_cast<uint16_t>(pos + 1)];
+	float fraction = pos - std::floor(pos);
+	return low + fraction * (high - low);
+}
+
+
 // Capacitor charging equation: Vc = Vs(1 - e ^ -t/RC)
 // Capacitor discharge equation: Vc = Vo * e ^ -t/RC
 
-
+float minexp = 999999.99f, maxexp = -999999.99;
 
 void Envelope::calcEnvelope() {
 
@@ -36,7 +61,7 @@ void Envelope::calcEnvelope() {
 			break;
 
 		case gateStates::attack: {
-
+			GPIOC->ODR |= GPIO_IDR_ID6;
 			attack = std::max((int)ADC_array[ADC_Attack], 200);
 
 			// fullRange = value of fully charged capacitor; comparitor value is 4096 where cap is charged enough to trigger decay phase
@@ -47,14 +72,18 @@ void Envelope::calcEnvelope() {
 			float maxDurationMult = (longTimes ? 7.7f : 0.9f) / 1.73;		// 1.73 allows duration to be set in seconds
 
 			// RC value - attackScale represents R component; maxDurationMult represents capacitor size
-			//GPIOC->ODR |= GPIO_IDR_ID6;
 			rc = std::pow(static_cast<float>(attack) / 4096.f, attackScale) * maxDurationMult;		// Reduce rc for a steeper curve
-			//GPIOC->ODR &= ~GPIO_ODR_ODR_6;
 
 			if (rc != 0.0f) {
 				float xPos = -rc * std::log(1.f - (currentLevel / fullRange));		// Invert capacitor equation to calculate current 'time' based on y/voltage value
 				float newXPos = xPos + timeStep;
 				exponent = -newXPos / rc;
+
+				if (exponent > maxexp)
+					maxexp = exponent;
+				if (exponent < minexp)
+					minexp = exponent;
+
 				float newYPos = 1.0f - std::exp(exponent);		// Capacitor charging equation
 				currentLevel = newYPos * fullRange;
 			} else {
@@ -68,6 +97,7 @@ void Envelope::calcEnvelope() {
 				currentLevel = 4095.0f;
 				gateState = gateStates::decay;
 			}
+			GPIOC->ODR &= ~GPIO_ODR_ODR_6;
 			break;
 
 		}
@@ -89,7 +119,16 @@ void Envelope::calcEnvelope() {
 					int susp = 1;
 				}
 				float newXPos = xPos + timeStep;
-				float newYPos = std::exp(-newXPos / rc);		// Capacitor discharging equation
+
+				exponent = -newXPos / rc;
+				if (exponent > maxexp)
+					maxexp = exponent;
+				if (exponent < minexp)
+					minexp = exponent;
+
+				float newYPos = std::exp(exponent);		// Capacitor discharging equation
+				volatile float newYPosa = expApprox(exponent);		// Capacitor charging equation
+
 				currentLevel = (newYPos * yHeight) + sustain;
 
 			} else {

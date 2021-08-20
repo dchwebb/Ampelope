@@ -7,6 +7,10 @@ extern volatile uint32_t SysTickVal;
 
 #define SYSTICK 1000						// 1ms
 #define SAMPLERATE 48000.0f
+#define EXP_LOOKUP_SIZE 4096						// Size of lookup table
+#define EXP_LOOKUP_MIN -1.75f
+#define EXP_LOOKUP_MAX 0.0f
+#define EXP_LOOKUP_INC (EXP_LOOKUP_MAX - EXP_LOOKUP_MIN) / static_cast<float>(EXP_LOOKUP_SIZE)
 
 #define ADC_BUFFER_LENGTH 4
 extern volatile uint16_t ADC_array[ADC_BUFFER_LENGTH];
