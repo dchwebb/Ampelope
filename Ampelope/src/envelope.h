@@ -1,6 +1,7 @@
 #pragma once
 
 #include "initialisation.h"
+#include <cmath>
 
 struct Envelope {
 public:
@@ -22,5 +23,19 @@ public:
 	enum class gateStates {off, attack, decay, sustain, release};
 	gateStates gateState = gateStates::off;
 
+
+	static const uint16_t ExpLookupSize = 6000;						// Size of lookup table
+	static constexpr const float ExpLookupMin = -1.75f;
+	static constexpr const float ExpLookupMax = 0.0f;
+	static constexpr const float ExpLookupInc = (ExpLookupMax - ExpLookupMin) / static_cast<float>(ExpLookupSize);
+	static float expArray[ExpLookupSize];
+
 	void calcEnvelope();
+
+	void CreateExpLookup();
+	float ExpApprox(float p);
 };
+
+
+
+

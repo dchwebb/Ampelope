@@ -20,15 +20,15 @@ extern "C" {
 }
 
 
-float expArray[EXP_LOOKUP_SIZE];
-void expLookup() {
-	const float max = 0.0f;		// -1.3704644E-5
-	const float min = EXP_LOOKUP_MIN;
-	const float inc = (max - min) / static_cast<float>(EXP_LOOKUP_SIZE);
-	for (int i = 0; i < EXP_LOOKUP_SIZE; ++i) {
-		expArray[i] = std::exp(min + (inc * static_cast<float>(i)));
-	}
-}
+//float expArray[EXP_LOOKUP_SIZE];
+//void expLookup() {
+//
+//	const float inc = (EXP_LOOKUP_MAX - EXP_LOOKUP_MIN) / static_cast<float>(EXP_LOOKUP_SIZE);
+//	for (int i = 0; i < EXP_LOOKUP_SIZE; ++i) {
+//		expArray[i] = std::exp(EXP_LOOKUP_MIN + (inc * static_cast<float>(i)));
+//		//expArray[i] = std::exp(EXP_LOOKUP_MIN + (EXP_LOOKUP_INC * static_cast<float>(i)));
+//	}
+//}
 
 extern uint32_t SystemCoreClock;
 int main(void)
@@ -45,7 +45,7 @@ int main(void)
 	InitCordic();
 
 	usb.InitUSB();
-	expLookup();
+	envelope.CreateExpLookup();
 
 	while (1)
 	{
