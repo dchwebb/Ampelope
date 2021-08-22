@@ -14,34 +14,20 @@ void Envelope::CreateExpLookup() {
 
 
 float CordicExp(float x) {
-	// sinh function - only values from  -1.118 to +1.118
+	// use CORDIC sinh function and generate e^x = sinh(x) + cosh(x) - only values from  -1.118 to +1.118
 	CORDIC->CSR = CORDIC_CSR_FUNC_1 | CORDIC_CSR_FUNC_2 | 		// 0: Cos, 1: Sin, 2: Phase, 3: Modulus, 4: Arctan, 5: cosh, 6: sinh, 7: Arctanh, 8: ln, 9: Square Root
-			CORDIC_CSR_SCALE_0 |
-			CORDIC_CSR_NRES |
-			CORDIC_CSR_PRECISION_0 | CORDIC_CSR_PRECISION_2;
+			CORDIC_CSR_SCALE_0 |								// Must be 1 for sinh
+			CORDIC_CSR_NRES |									// 2 Results as we need both sinh and cosh
+			CORDIC_CSR_PRECISION_0 | CORDIC_CSR_PRECISION_2;	// Set precision to 5 (gives 5 * 4 = 20 iterations)
 
 	// convert float to q1_31 format
-	x = -1.f;
-	//uint32_t q31 = (uint32_t)((x / 2) * 2147483648);
-    union {
-        float    f;
-        uint32_t q31;
-    } temp;
-	temp.f = x * 2147483648.0f / 2.0f;
-	uint32_t q31 = temp.q31;
+	int q31 = (int)(x * 1073741824.0f);
 
-	uint32_t q31b = q31_float_to_int(-0.5f);
-	int q31c = (int)((x / 2.0f) * (float)0x7FFFFFFF);
+	CORDIC->WDATA = q31;
+	//while ((CORDIC->CSR & CORDIC_CSR_RRDY) == 0);
 
-	//uint32_t q31 = (uint32_t)((float)x * 2147483648.0f / 2.0f);
-	CORDIC->WDATA = q31c;
-	while ((CORDIC->CSR & CORDIC_CSR_RRDY) == 0);
-	uint32_t a = CORDIC->RDATA;
-	uint32_t b = CORDIC->RDATA;
-
-	float sinh = static_cast<float>(a * 2) / 2147483648;
-	float sinh2 = (float)((int)a) / 1073741824.0f;
-	float cosh = static_cast<float>(b * 2) / 2147483648;
+	float sinh = (float)((int)CORDIC->RDATA) / 1073741824.0f;	// command will block until RDATA is ready - no need to poll RRDY flag
+	float cosh = (float)((int)CORDIC->RDATA) / 1073741824.0f;
 	float res = sinh + cosh;
 	return res;
 }
@@ -53,7 +39,7 @@ float CordicLn(float x) {
 			CORDIC_CSR_SCALE_0;				// 1: 0.107 ≤ x < 1
 
 	// convert float to q1_31 format
-	uint32_t q31 = (uint32_t)((x / 2) * 2147483648);   //0 <= n < blockSize.
+	uint32_t q31 = (uint32_t)((x / 2) * 2147483648);
 	CORDIC->WDATA = q31;
 	while ((CORDIC->CSR & CORDIC_CSR_RRDY) == 0);
 	return static_cast<float>((int)CORDIC->RDATA * 4) / 2147483648;
@@ -140,11 +126,12 @@ void Envelope::calcEnvelope() {
 				if (exponent < minexp)
 					minexp = exponent;
 
-				//float newYPos = 1.0f - std::exp(exponent);		// Capacitor charging equation
+				float newYPos_cordic;
 				if (exponent > -1.118 && exponent < 1.118) {
-					float test = CordicExp(exponent);		// Capacitor charging equation
+					newYPos_cordic = 1.0f - CordicExp(exponent);		// Capacitor charging equation
 				}
-				float newYPos = 1.0f - ExpApprox(exponent);		// Capacitor charging equation
+
+				float newYPos = 1.0f - std::exp(exponent);		// Capacitor charging equation
 
 				currentLevel = newYPos * fullRange;
 			} else {
