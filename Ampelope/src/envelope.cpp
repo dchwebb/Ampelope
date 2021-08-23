@@ -15,34 +15,42 @@ void Envelope::CreateExpLookup() {
 
 float CordicExp(float x) {
 	// use CORDIC sinh function and generate e^x = sinh(x) + cosh(x) - only values from  -1.118 to +1.118
-	CORDIC->CSR = CORDIC_CSR_FUNC_1 | CORDIC_CSR_FUNC_2 | 		// 0: Cos, 1: Sin, 2: Phase, 3: Modulus, 4: Arctan, 5: cosh, 6: sinh, 7: Arctanh, 8: ln, 9: Square Root
-			CORDIC_CSR_SCALE_0 |								// Must be 1 for sinh
-			CORDIC_CSR_NRES |									// 2 Results as we need both sinh and cosh
-			CORDIC_CSR_PRECISION_0 | CORDIC_CSR_PRECISION_2;	// Set precision to 5 (gives 5 * 4 = 20 iterations)
+	CORDIC->CSR = (6 << CORDIC_CSR_FUNC_Pos) | 		// 0: Cos, 1: Sin, 2: Phase, 3: Modulus, 4: Arctan, 5: cosh, 6: sinh, 7: Arctanh, 8: ln, 9: Square Root
+			CORDIC_CSR_SCALE_0 |					// Must be 1 for sinh
+			CORDIC_CSR_NRES |						// 2 Results as we need both sinh and cosh
+			(5 << CORDIC_CSR_PRECISION_Pos);		// Set precision to 5 (gives 5 * 4 = 20 iterations in 5 clock cycles)
 
-	// convert float to q1_31 format
-	int q31 = (int)(x * 1073741824.0f);
+	// convert float to q1_31 format scaling x by 1/2 at the same time
+	int q31;
+	if (x < -1.118f) {
+		q31 = (int)((x + 1.0f) * 1073741824.0f);		// as range of x is limited to -1.118 to +1.118 reduce exponent by constant (note that only values from around -1.75 to 0 used in this mechanism)
+	} else {
+		q31 = (int)(x * 1073741824.0f);
+	}
 
 	CORDIC->WDATA = q31;
-	//while ((CORDIC->CSR & CORDIC_CSR_RRDY) == 0);
 
+	// convert values back to floats scaling by * 2 at the same time
 	float sinh = (float)((int)CORDIC->RDATA) / 1073741824.0f;	// command will block until RDATA is ready - no need to poll RRDY flag
 	float cosh = (float)((int)CORDIC->RDATA) / 1073741824.0f;
 	float res = sinh + cosh;
-	return res;
+	if (x < -1.118f) {
+		return res * 0.3678794411714f;					// multiply by e^-1 to correct range offset
+	} else {
+		return res;
+	}
 }
 
-
-
 float CordicLn(float x) {
-	CORDIC->CSR = CORDIC_CSR_FUNC_3 | 		// 0: Cosine, 1: Sine, 2: Phase, 3: Modulus, 4: Arctangent, 5: Hyperbolic cosine, 6: Hyperbolic sine, 7: Arctanh, 8: Natural logarithm, 9: Square Root
-			CORDIC_CSR_SCALE_0;				// 1: 0.107 ≤ x < 1
+	CORDIC->CSR = (8 << CORDIC_CSR_FUNC_Pos) | 		// 0: Cosine, 1: Sine, 2: Phase, 3: Modulus, 4: Arctangent, 5: Hyperbolic cosine, 6: Hyperbolic sine, 7: Arctanh, 8: Natural logarithm, 9: Square Root
+			CORDIC_CSR_SCALE_0 |					// 1: 0.107 ≤ x < 1
+			(5 << CORDIC_CSR_PRECISION_Pos);		// Set precision to 5 (gives 5 * 4 = 20 iterations in 5 clock cycles)
 
-	// convert float to q1_31 format
-	uint32_t q31 = (uint32_t)((x / 2) * 2147483648);
+	int q31 = (int)(x * 1073741824.0f);				// convert float to q1_31 format scaling x by 1/2 at the same time
 	CORDIC->WDATA = q31;
-	while ((CORDIC->CSR & CORDIC_CSR_RRDY) == 0);
-	return static_cast<float>((int)CORDIC->RDATA * 4) / 2147483648;
+
+	// convert values back to floats scaling by * 4 at the same time
+	return static_cast<float>((int)CORDIC->RDATA) / 536870912.0f;	// command will block until RDATA is ready - no need to poll RRDY flag
 }
 
 // Gives maximum error of 0.1 / 1.24 (ie 8%)
@@ -91,7 +99,7 @@ void Envelope::calcEnvelope() {
 
 	// Gate on
 	if ((GPIOC->IDR & GPIO_IDR_ID8) == 0) {
-		GPIOC->ODR |= GPIO_IDR_ID6;
+		//GPIOC->ODR |= GPIO_IDR_ID6;
 		sustain = ADC_array[ADC_Sustain];
 
 		switch (gateState) {
@@ -109,36 +117,31 @@ void Envelope::calcEnvelope() {
 
 			// scales attack pot to allow more range at low end of pot, exponentially longer times at upper end
 			const float attackScale = 2.9f;			// higher values give shorter attack times at lower pot values
-			float maxDurationMult = (longTimes ? 7.7f : 0.9f) / 1.73;		// 1.73 allows duration to be set in seconds
+			float maxDurationMult = (longTimes ? 7.7f : 0.9f) / 1.73f;		// 1.73 allows duration to be set in seconds
 
 			// RC value - attackScale represents R component; maxDurationMult represents capacitor size
+			GPIOC->ODR |= GPIO_IDR_ID6;
 			rc = std::pow(static_cast<float>(attack) / 4096.f, attackScale) * maxDurationMult;		// Reduce rc for a steeper curve
+			GPIOC->ODR &= ~GPIO_IDR_ID6;
 
 			if (rc != 0.0f) {
-				volatile float lnc = CordicLn(1.f - (currentLevel / fullRange));
-				float ln = std::log(1.f - (currentLevel / fullRange));
-				float xPos = -rc * ln;		// Invert capacitor equation to calculate current 'time' based on y/voltage value
-				float newXPos = xPos + timeStep;
-				exponent = -newXPos / rc;
-
-				if (exponent > maxexp)
-					maxexp = exponent;
-				if (exponent < minexp)
-					minexp = exponent;
-
-				float newYPos_cordic;
-				if (exponent > -1.118 && exponent < 1.118) {
-					newYPos_cordic = 1.0f - CordicExp(exponent);		// Capacitor charging equation
-				}
-
-				float newYPos = 1.0f - std::exp(exponent);		// Capacitor charging equation
+				/*
+				 * Long hand calculations:
+				 * 1. Invert capacitor equation to calculate current 'time' based on y/voltage value
+				 * float ln = std::log(1.0f - (currentLevel / fullRange));
+				 * float xPos = -rc * ln;
+				 * float newXPos = xPos + timeStep;		// Add timeStep (based on sample rate) to current X position
+				 *
+				 * 2. Calculate exponential of time for capacitor charging equation
+				 * float exponent = -newXPos / rc;
+				 * float newYPos = 1.0f - std::exp(exponent);
+				 */
+				float newYPos = 1.0f - (1.0f - (currentLevel / fullRange)) * CordicExp(- timeStep / rc);
 
 				currentLevel = newYPos * fullRange;
+
 			} else {
 				currentLevel = fullRange;
-			}
-			if (std::isnan(currentLevel)) {
-				int susp = 1;
 			}
 
 			if (currentLevel >= 4095.0f) {
@@ -160,29 +163,28 @@ void Envelope::calcEnvelope() {
 			float yHeight = 4096.0f - sustain;		// Height of decay curve
 
 			// RC value - decayScale represents R component; maxDurationMult represents capacitor size
+			GPIOC->ODR |= GPIO_IDR_ID6;
 			rc = std::pow(static_cast<float>(decay) / 4096.0f, decayScale) * maxDurationMult;
+			GPIOC->ODR &= ~GPIO_IDR_ID6;
+
 			if (rc != 0.0f && currentLevel > sustain) {
-				float xPos = -rc * std::log((currentLevel - sustain) / yHeight);		// Invert capacitor discharge equation to calculate current 'time' based on y/voltage
-				if (std::isnan(xPos)) {
-					int susp = 1;
-				}
-				float newXPos = xPos + timeStep;
+				/*
+				 * Long hand calculations:
+				 * 1. Invert capacitor discharge equation to calculate current 'time' based on y/voltage
+				 * float xPos = -rc * std::log((currentLevel - sustain) / yHeight);
+				 * float newXPos = xPos + timeStep;
+				 *
+				 * 2. Calculate exponential of time for capacitor discharging equation
+				 * float exponent = -newXPos / rc;
+				 * float newYPos = std::exp(exponent);		// Capacitor discharging equation
+				 */
 
-				exponent = -newXPos / rc;
-				if (exponent > maxexp)
-					maxexp = exponent;
-				if (exponent < minexp)
-					minexp = exponent;
-
-				//float newYPos = std::exp(exponent);		// Capacitor discharging equation
-				float newYPos = ExpApprox(exponent);		// Capacitor charging equation
-
+				float newYPos = ((currentLevel - sustain) / yHeight) * CordicExp(- timeStep / rc);		// Capacitor discharging equation
 				currentLevel = (newYPos * yHeight) + sustain;
 
 			} else {
 				currentLevel = 0.0f;
 			}
-
 
 			if (currentLevel <= sustain + 1.5f) {				// add a little extra to avoid getting stuck in infinitely small decrease
 				currentLevel = sustain;
