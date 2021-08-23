@@ -2,19 +2,8 @@
 #include <cmath>
 #include <ctgmath>
 
-float Envelope::expArray[Envelope::ExpLookupSize];
 
-void Envelope::CreateExpLookup()
-{
-	for (int i = 0; i < ExpLookupSize; ++i) {
-		expArray[i] = std::exp(ExpLookupMin + (ExpLookupInc * static_cast<float>(i)));
-	}
-}
-
-#define q31_float_to_int(x) ((int)((float)(x) * (float)0x7FFFFFFF))
-
-
-float CordicExp(float x)
+float Envelope::CordicExp(float x)
 {
 	// use CORDIC sinh function and generate e^x = sinh(x) + cosh(x) - only values from  -1.118 to +1.118
 	CORDIC->CSR = (6 << CORDIC_CSR_FUNC_Pos) | 		// 0: Cos, 1: Sin, 2: Phase, 3: Modulus, 4: Arctan, 5: cosh, 6: sinh, 7: Arctanh, 8: ln, 9: Square Root
@@ -43,7 +32,7 @@ float CordicExp(float x)
 	}
 }
 
-float CordicLn(float x)
+float Envelope::CordicLn(float x)
 {
 	CORDIC->CSR = (8 << CORDIC_CSR_FUNC_Pos) | 		// 0: Cosine, 1: Sine, 2: Phase, 3: Modulus, 4: Arctangent, 5: Hyperbolic cosine, 6: Hyperbolic sine, 7: Arctanh, 8: Natural logarithm, 9: Square Root
 			CORDIC_CSR_SCALE_0 |					// 1: 0.107 ≤ x < 1
@@ -56,55 +45,21 @@ float CordicLn(float x)
 	return static_cast<float>((int)CORDIC->RDATA) / 536870912.0f;	// command will block until RDATA is ready - no need to poll RRDY flag
 }
 
-// Gives maximum error of 0.1 / 1.24 (ie 8%)
-float fastPow(float a, float b)
-{
-    union {
-        float    f;
-        uint32_t u;
-    } temp;
-    temp.f = a;
-    temp.u = (uint32_t)(b * (float)(temp.u - 1064866808) + 1064866808);
-    return temp.f;
-}
 
-float fastPow2(double a, double b) {
-    union {
-        double d;
-        int x[2];
-    } u = { a };
-    u.x[1] = (int)(b * (u.x[1] - 1072632447) + 1072632447);
-    u.x[0] = 0;
-    return (float)u.d;
-}
-
-float Envelope::ExpApprox(float p) {
-
-	//const float inc = (EXP_LOOKUP_MAX - ExpLookupMin) / static_cast<float>(ExpLookupSize);
-	float pos = (p - ExpLookupMin) / ExpLookupInc;
-
-	if (pos >= ExpLookupSize - 1) {
-		//return 1.0f;
-		return expArray[ExpLookupSize - 1];
-	}
-	if (pos < 0.0) {
-		return expArray[0];
-	}
-
-	float low = expArray[static_cast<uint16_t>(pos)];
-	float high = expArray[static_cast<uint16_t>(pos + 1)];
-	float fraction = pos - std::floor(pos);
-	return low + fraction * (high - low);
-}
-
-
-
-float minexp = 999999.99f, maxexp = -999999.99;
+//float Envelope::CordicSin(float x)
+//{
+//	CORDIC->CSR = (1 << CORDIC_CSR_FUNC_Pos) | 		// 0: Cosine, 1: Sine, 2: Phase, 3: Modulus, 4: Arctangent, 5: Hyperbolic cosine, 6: Hyperbolic sine, 7: Arctanh, 8: Natural logarithm, 9: Square Root
+//			(5 << CORDIC_CSR_PRECISION_Pos);		// Set precision to 5 (gives 5 * 4 = 20 iterations in 5 clock cycles)
+//
+//	int q31 = (int)(x * 1073741824.0f);				// convert float to q1_31 format scaling x by 1/2 at the same time
+//	CORDIC->WDATA = q31;
+//
+//	// convert values back to floats scaling by * 4 at the same time
+//	return static_cast<float>((int)CORDIC->RDATA) / 536870912.0f;	// command will block until RDATA is ready - no need to poll RRDY flag
+//}
 
 void Envelope::calcEnvelope() {
 
-	//CORDIC->WDATA = cordic_inc;		// This should be a value between -1 and 1 in q1.31 format, relating to -pi to +pi
-	cordic_inc += ADC_array[ADC_Release] * 200;
 
 	// Gate on
 	if ((GPIOC->IDR & GPIO_IDR_ID8) == 0) {
@@ -113,13 +68,12 @@ void Envelope::calcEnvelope() {
 
 		switch (gateState) {
 		case gateStates::off:
-			//currentLevel = 0;
 			gateState = gateStates::attack;
 			break;
 
 		case gateStates::attack: {
 
-			attack = ADC_array[ADC_Attack];
+			attack = std::round(((attack * 31.0f) + (float)ADC_array[ADC_Attack]) / 32.0f);
 
 			// fullRange = value of fully charged capacitor; comparitor value is 4096 where cap is charged enough to trigger decay phase
 			const float fullRange = 5000.0f;
@@ -127,9 +81,8 @@ void Envelope::calcEnvelope() {
 			// scales attack pot to allow more range at low end of pot, exponentially longer times at upper end
 			float maxDurationMult = (longTimes ? 7.7f : 0.9f) / 1.73f;		// 1.73 allows duration to be set in seconds
 
-			// RC value - attackScale represents R component; maxDurationMult represents capacitor size
-			// Using a^3 for fast approximation for measured charging rate (^2.9)
-			rc = std::pow(static_cast<float>(attack) / 4096.f, 3.0f) * maxDurationMult;		// Reduce rc for a steeper curve
+			// RC value - attackScale represents R component; maxDurationMult represents capacitor size (Reduce rc for a steeper curve)
+			float rc = std::pow(static_cast<float>(attack) / 4096.f, 3.0f) * maxDurationMult;		// Using a^3 for fast approximation for measured charging rate (^2.9)
 
 			if (rc != 0.0f) {
 				/*
@@ -166,12 +119,9 @@ void Envelope::calcEnvelope() {
 
 			// scales decay pot to allow more range at low end of pot, exponentially longer times at upper end
 			float maxDurationMult = (longTimes ? 44.0f : 5.28f) / 4.4;		// to scale maximum delay time
-			//float yHeight = 4096.0f - sustain;		// Height of decay curve
 
 			// RC value - decayScale represents R component; maxDurationMult represents capacitor size
-//			float d = (float)decay / 4096.0f;
-//			rc = d * d * maxDurationMult;		// Use x^2 as approximation for measured x^2.4
-			rc = std::pow((float)decay / 4096.0f, 2.0f) * maxDurationMult;		// Use x^2 as approximation for measured x^2.4
+			float rc = std::pow((float)decay / 4096.0f, 2.0f) * maxDurationMult;		// Use x^2 as approximation for measured x^2.4
 
 			if (rc != 0.0f && currentLevel > sustain) {
 				/*
@@ -211,19 +161,26 @@ void Envelope::calcEnvelope() {
 		}
 
 	} else {
-		if (currentLevel > 0) {
+		if (currentLevel > 0.0f) {
+			GPIOC->ODR |= GPIO_IDR_ID6;
+
 			release = ADC_array[ADC_Release];
 
-			const float releaseScale = 2.4f;			// higher values give shorter attack times at lower pot values
+			//const float releaseScale = 2.4f;			// higher values give shorter attack times at lower pot values
 			float maxDurationMult = (longTimes ? 44.0f : 5.2f) / 1.3;		// to scale maximum delay time
 
 			// RC value - decayScale represents R component; maxDurationMult represents capacitor size
-			rc = std::pow(static_cast<float>(release) / 4096.0f, releaseScale) * maxDurationMult;
-			if (rc != 0.0f) {
-				float xPos = -rc * std::log(currentLevel / 4096.0f);
-				float newXPos = xPos + timeStep;
-				float newYPos = std::exp(-newXPos / rc);
-				currentLevel = newYPos * 4096.0f;
+			float rc = std::pow(static_cast<float>(release) / 4096.0f, 2.0f) * maxDurationMult;
+			if (rc != 0.0f && currentLevel > 1.0f) {
+				/*
+				 * Long hand calculations:
+				 * float xPos = -rc * std::log(currentLevel / 4096.0f);
+				 * float newXPos = xPos + timeStep;
+				 * float newYPos = std::exp(-newXPos / rc);
+				 * currentLevel = newYPos * 4096.0f;
+				 */
+
+				currentLevel = currentLevel * CordicExp(-timeStep / rc);
 			} else {
 				currentLevel = 0.0f;
 			}
@@ -233,10 +190,14 @@ void Envelope::calcEnvelope() {
 	}
 
 	if (lfo) {
-		if (CORDIC->CSR & CORDIC_CSR_RRDY) {
-			cordic_sin = static_cast<float>(static_cast<int32_t>(CORDIC->RDATA)) / 4294967295.0f + 0.5f;
-			DAC1->DHR12R1 = static_cast<uint32_t>((4095.0f - currentLevel * cordic_sin));
-		}
+		CORDIC->CSR = (1 << CORDIC_CSR_FUNC_Pos) | 		// 0: Cosine, 1: Sine, 2: Phase, 3: Modulus, 4: Arctangent, 5: Hyperbolic cosine, 6: Hyperbolic sine, 7: Arctanh, 8: Natural logarithm, 9: Square Root
+				(5 << CORDIC_CSR_PRECISION_Pos);		// Set precision to 5 (gives 5 * 4 = 20 iterations in 5 clock cycles)
+
+		CORDIC->WDATA = cordic_inc;		// This should be a value between -1 and 1 in q1.31 format, relating to -pi to +pi
+		cordic_inc += ADC_array[ADC_Release] * 200;
+
+		cordic_sin = static_cast<float>(static_cast<int32_t>(CORDIC->RDATA)) / 4294967295.0f + 0.5f;
+		DAC1->DHR12R1 = static_cast<uint32_t>((4095.0f - currentLevel * cordic_sin));
 	} else {
 		DAC1->DHR12R1 = static_cast<uint32_t>(4095.0f - currentLevel);
 	}

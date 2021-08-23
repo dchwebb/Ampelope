@@ -97,22 +97,6 @@ bool SerialHandler::Command()
 	} else if (ComCmd.compare("s\n") == 0) {				// Short envelope times
 		envelope.longTimes = false;
 
-	} else if (ComCmd.compare("exp\n") == 0) {				// Print exponential lookup
-		TIM3->CR1 |= TIM_CR1_CEN;		// Disable timer interrupt
-
-		//extern float Envelope::expArray[ExpLookupSize];
-		for (int i = 0; i < Envelope::ExpLookupSize; ++i) {
-			sprintf(buf, "%0.10f", Envelope::ExpLookupMin + (Envelope::ExpLookupInc * static_cast<float>(i)));
-			std::string in = std::string(buf);
-
-			sprintf(buf, "%0.10f", Envelope::expArray[i]);
-			std::string out = std::string(buf);
-
-			usb->SendString(std::to_string(i) + "\t" + in + "\t" + out + "\r\n");
-		}
-		TIM3->CR1 |= TIM_CR1_CEN;							// Re-enable timer interrupt
-
-
 	} else if (ComCmd.compare("cordic\n") == 0) {			// Cordic Test
 		TIM3->CR1 |= TIM_CR1_CEN;		// Disable timer interrupt
 

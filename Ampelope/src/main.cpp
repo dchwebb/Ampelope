@@ -45,7 +45,6 @@ int main(void)
 	InitCordic();
 
 	usb.InitUSB();
-	envelope.CreateExpLookup();
 
 	while (1)
 	{
