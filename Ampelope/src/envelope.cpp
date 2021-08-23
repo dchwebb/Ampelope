@@ -4,7 +4,8 @@
 
 float Envelope::expArray[Envelope::ExpLookupSize];
 
-void Envelope::CreateExpLookup() {
+void Envelope::CreateExpLookup()
+{
 	for (int i = 0; i < ExpLookupSize; ++i) {
 		expArray[i] = std::exp(ExpLookupMin + (ExpLookupInc * static_cast<float>(i)));
 	}
@@ -13,7 +14,8 @@ void Envelope::CreateExpLookup() {
 #define q31_float_to_int(x) ((int)((float)(x) * (float)0x7FFFFFFF))
 
 
-float CordicExp(float x) {
+float CordicExp(float x)
+{
 	// use CORDIC sinh function and generate e^x = sinh(x) + cosh(x) - only values from  -1.118 to +1.118
 	CORDIC->CSR = (6 << CORDIC_CSR_FUNC_Pos) | 		// 0: Cos, 1: Sin, 2: Phase, 3: Modulus, 4: Arctan, 5: cosh, 6: sinh, 7: Arctanh, 8: ln, 9: Square Root
 			CORDIC_CSR_SCALE_0 |					// Must be 1 for sinh
@@ -41,7 +43,8 @@ float CordicExp(float x) {
 	}
 }
 
-float CordicLn(float x) {
+float CordicLn(float x)
+{
 	CORDIC->CSR = (8 << CORDIC_CSR_FUNC_Pos) | 		// 0: Cosine, 1: Sine, 2: Phase, 3: Modulus, 4: Arctangent, 5: Hyperbolic cosine, 6: Hyperbolic sine, 7: Arctanh, 8: Natural logarithm, 9: Square Root
 			CORDIC_CSR_SCALE_0 |					// 1: 0.107 ≤ x < 1
 			(5 << CORDIC_CSR_PRECISION_Pos);		// Set precision to 5 (gives 5 * 4 = 20 iterations in 5 clock cycles)
@@ -65,7 +68,15 @@ float fastPow(float a, float b)
     return temp.f;
 }
 
-
+float fastPow2(double a, double b) {
+    union {
+        double d;
+        int x[2];
+    } u = { a };
+    u.x[1] = (int)(b * (u.x[1] - 1072632447) + 1072632447);
+    u.x[0] = 0;
+    return (float)u.d;
+}
 
 float Envelope::ExpApprox(float p) {
 
@@ -87,8 +98,6 @@ float Envelope::ExpApprox(float p) {
 }
 
 
-// Capacitor charging equation: Vc = Vs(1 - e ^ -t/RC)
-// Capacitor discharge equation: Vc = Vo * e ^ -t/RC
 
 float minexp = 999999.99f, maxexp = -999999.99;
 
@@ -99,7 +108,7 @@ void Envelope::calcEnvelope() {
 
 	// Gate on
 	if ((GPIOC->IDR & GPIO_IDR_ID8) == 0) {
-		//GPIOC->ODR |= GPIO_IDR_ID6;
+		GPIOC->ODR |= GPIO_IDR_ID6;
 		sustain = ADC_array[ADC_Sustain];
 
 		switch (gateState) {
@@ -110,23 +119,22 @@ void Envelope::calcEnvelope() {
 
 		case gateStates::attack: {
 
-			attack = std::max((int)ADC_array[ADC_Attack], 200);
+			attack = ADC_array[ADC_Attack];
 
 			// fullRange = value of fully charged capacitor; comparitor value is 4096 where cap is charged enough to trigger decay phase
 			const float fullRange = 5000.0f;
 
 			// scales attack pot to allow more range at low end of pot, exponentially longer times at upper end
-			const float attackScale = 2.9f;			// higher values give shorter attack times at lower pot values
 			float maxDurationMult = (longTimes ? 7.7f : 0.9f) / 1.73f;		// 1.73 allows duration to be set in seconds
 
 			// RC value - attackScale represents R component; maxDurationMult represents capacitor size
-			GPIOC->ODR |= GPIO_IDR_ID6;
-			rc = std::pow(static_cast<float>(attack) / 4096.f, attackScale) * maxDurationMult;		// Reduce rc for a steeper curve
-			GPIOC->ODR &= ~GPIO_IDR_ID6;
+			// Using a^3 for fast approximation for measured charging rate (^2.9)
+			rc = std::pow(static_cast<float>(attack) / 4096.f, 3.0f) * maxDurationMult;		// Reduce rc for a steeper curve
 
 			if (rc != 0.0f) {
 				/*
 				 * Long hand calculations:
+				 * Capacitor charging equation: Vc = Vs(1 - e ^ -t/RC)
 				 * 1. Invert capacitor equation to calculate current 'time' based on y/voltage value
 				 * float ln = std::log(1.0f - (currentLevel / fullRange));
 				 * float xPos = -rc * ln;
@@ -135,10 +143,10 @@ void Envelope::calcEnvelope() {
 				 * 2. Calculate exponential of time for capacitor charging equation
 				 * float exponent = -newXPos / rc;
 				 * float newYPos = 1.0f - std::exp(exponent);
+				 * currentLevel = newYPos * fullRange;
 				 */
-				float newYPos = 1.0f - (1.0f - (currentLevel / fullRange)) * CordicExp(- timeStep / rc);
 
-				currentLevel = newYPos * fullRange;
+				currentLevel = fullRange - (fullRange - currentLevel) * CordicExp(-timeStep / rc);
 
 			} else {
 				currentLevel = fullRange;
@@ -148,7 +156,7 @@ void Envelope::calcEnvelope() {
 				currentLevel = 4095.0f;
 				gateState = gateStates::decay;
 			}
-
+			GPIOC->ODR &= ~GPIO_IDR_ID6;
 			break;
 
 		}
@@ -157,30 +165,30 @@ void Envelope::calcEnvelope() {
 			decay = ADC_array[ADC_Decay];
 
 			// scales decay pot to allow more range at low end of pot, exponentially longer times at upper end
-			const float decayScale = 2.4f;			// higher values give shorter attack times at lower pot values
 			float maxDurationMult = (longTimes ? 44.0f : 5.28f) / 4.4;		// to scale maximum delay time
-
-			float yHeight = 4096.0f - sustain;		// Height of decay curve
+			//float yHeight = 4096.0f - sustain;		// Height of decay curve
 
 			// RC value - decayScale represents R component; maxDurationMult represents capacitor size
-			GPIOC->ODR |= GPIO_IDR_ID6;
-			rc = std::pow(static_cast<float>(decay) / 4096.0f, decayScale) * maxDurationMult;
-			GPIOC->ODR &= ~GPIO_IDR_ID6;
+//			float d = (float)decay / 4096.0f;
+//			rc = d * d * maxDurationMult;		// Use x^2 as approximation for measured x^2.4
+			rc = std::pow((float)decay / 4096.0f, 2.0f) * maxDurationMult;		// Use x^2 as approximation for measured x^2.4
 
 			if (rc != 0.0f && currentLevel > sustain) {
 				/*
 				 * Long hand calculations:
+				 * Capacitor discharge equation: Vc = Vo * e ^ -t/RC
 				 * 1. Invert capacitor discharge equation to calculate current 'time' based on y/voltage
+				 * float yHeight = 4096.0f - sustain;		// Height of decay curve
 				 * float xPos = -rc * std::log((currentLevel - sustain) / yHeight);
 				 * float newXPos = xPos + timeStep;
 				 *
 				 * 2. Calculate exponential of time for capacitor discharging equation
 				 * float exponent = -newXPos / rc;
 				 * float newYPos = std::exp(exponent);		// Capacitor discharging equation
+				 * currentLevel = (newYPos * yHeight) + sustain;
 				 */
 
-				float newYPos = ((currentLevel - sustain) / yHeight) * CordicExp(- timeStep / rc);		// Capacitor discharging equation
-				currentLevel = (newYPos * yHeight) + sustain;
+				currentLevel = sustain + (currentLevel - sustain) * CordicExp(-timeStep / rc);
 
 			} else {
 				currentLevel = 0.0f;
@@ -190,6 +198,8 @@ void Envelope::calcEnvelope() {
 				currentLevel = sustain;
 				gateState = gateStates::sustain;
 			}
+
+
 			break;
 		}
 		case gateStates::sustain:
@@ -202,7 +212,7 @@ void Envelope::calcEnvelope() {
 
 	} else {
 		if (currentLevel > 0) {
-			//release = ADC_array[ADC_Release];
+			release = ADC_array[ADC_Release];
 
 			const float releaseScale = 2.4f;			// higher values give shorter attack times at lower pot values
 			float maxDurationMult = (longTimes ? 44.0f : 5.2f) / 1.3;		// to scale maximum delay time
