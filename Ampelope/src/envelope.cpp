@@ -5,7 +5,7 @@
 
 float Envelope::CordicExp(float x)
 {
-	// use CORDIC sinh function and generate e^x = sinh(x) + cosh(x) - only values from  -1.118 to +1.118
+	// use CORDIC sinh function and generate e^x = sinh(x) + cosh(x)
 	CORDIC->CSR = (6 << CORDIC_CSR_FUNC_Pos) | 		// 0: Cos, 1: Sin, 2: Phase, 3: Modulus, 4: Arctan, 5: cosh, 6: sinh, 7: Arctanh, 8: ln, 9: Square Root
 			CORDIC_CSR_SCALE_0 |					// Must be 1 for sinh
 			CORDIC_CSR_NRES |						// 2 Results as we need both sinh and cosh
@@ -14,7 +14,7 @@ float Envelope::CordicExp(float x)
 	// convert float to q1_31 format scaling x by 1/2 at the same time
 	int q31;
 	if (x < -1.118f) {
-		q31 = (int)((x + 1.0f) * 1073741824.0f);		// as range of x is limited to -1.118 to +1.118 reduce exponent by constant (note that only values from around -1.75 to 0 used in this mechanism)
+		q31 = (int)((x + 1.0f) * 1073741824.0f);		// as range of x is limited to -1.118 to +1.118 reduce exponent by e^-1 (note that only values from around -1.75 to 0 used in this mechanism)
 	} else {
 		q31 = (int)(x * 1073741824.0f);
 	}
@@ -46,17 +46,6 @@ float Envelope::CordicLn(float x)
 }
 
 
-//float Envelope::CordicSin(float x)
-//{
-//	CORDIC->CSR = (1 << CORDIC_CSR_FUNC_Pos) | 		// 0: Cosine, 1: Sine, 2: Phase, 3: Modulus, 4: Arctangent, 5: Hyperbolic cosine, 6: Hyperbolic sine, 7: Arctanh, 8: Natural logarithm, 9: Square Root
-//			(5 << CORDIC_CSR_PRECISION_Pos);		// Set precision to 5 (gives 5 * 4 = 20 iterations in 5 clock cycles)
-//
-//	int q31 = (int)(x * 1073741824.0f);				// convert float to q1_31 format scaling x by 1/2 at the same time
-//	CORDIC->WDATA = q31;
-//
-//	// convert values back to floats scaling by * 4 at the same time
-//	return static_cast<float>((int)CORDIC->RDATA) / 536870912.0f;	// command will block until RDATA is ready - no need to poll RRDY flag
-//}
 
 void Envelope::calcEnvelope() {
 
