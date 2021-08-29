@@ -1,5 +1,6 @@
 #include "initialisation.h"
 
+// Settings for 24MHz crystal
 #define PLL_M 0b101		// 0101: PLLM = 6
 #define PLL_N 85
 #define PLL_R 0			//  00: PLLR = 2, 01: PLLR = 4, 10: PLLR = 6, 11: PLLR = 8
