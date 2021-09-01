@@ -3,7 +3,9 @@
     "active_layer": 0,
     "active_layer_preset": "",
     "auto_track_width": false,
-    "hidden_nets": [],
+    "hidden_nets": [
+      "GND"
+    ],
     "high_contrast_mode": 0,
     "net_color_mode": 1,
     "opacity": {
@@ -20,8 +22,8 @@
       "keepouts": true,
       "lockedItems": true,
       "otherItems": true,
-      "pads": true,
-      "text": true,
+      "pads": false,
+      "text": false,
       "tracks": true,
       "vias": true,
       "zones": true
@@ -66,7 +68,7 @@
     "zone_display_mode": 1
   },
   "meta": {
-    "filename": "Ampelope.kicad_prl",
+    "filename": "Ampelope_Components.kicad_prl",
     "version": 3
   },
   "project": {
