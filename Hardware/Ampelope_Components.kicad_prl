@@ -4,7 +4,11 @@
     "active_layer_preset": "",
     "auto_track_width": false,
     "hidden_nets": [
-      "GND"
+      "GND",
+      "VCC",
+      "VEE",
+      "+3V3",
+      "+3.3VA"
     ],
     "high_contrast_mode": 0,
     "net_color_mode": 1,
