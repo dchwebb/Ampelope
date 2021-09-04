@@ -235,7 +235,6 @@ void InitADC()
 void InitCordic()
 {
 	RCC->AHB1ENR |= RCC_AHB1ENR_CORDICEN;
-	CORDIC->CSR |= CORDIC_CSR_FUNC_0;		// 0: Cosine, 1: Sine, 2: Phase, 3: Modulus, 4: Arctangent, 5: Hyperbolic cosine, 6: Hyperbolic sine, 7: Arctanh, 8: Natural logarithm, 9: Square Root
 }
 
 

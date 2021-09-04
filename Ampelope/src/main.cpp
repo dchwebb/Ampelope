@@ -20,15 +20,6 @@ extern "C" {
 }
 
 
-//float expArray[EXP_LOOKUP_SIZE];
-//void expLookup() {
-//
-//	const float inc = (EXP_LOOKUP_MAX - EXP_LOOKUP_MIN) / static_cast<float>(EXP_LOOKUP_SIZE);
-//	for (int i = 0; i < EXP_LOOKUP_SIZE; ++i) {
-//		expArray[i] = std::exp(EXP_LOOKUP_MIN + (inc * static_cast<float>(i)));
-//		//expArray[i] = std::exp(EXP_LOOKUP_MIN + (EXP_LOOKUP_INC * static_cast<float>(i)));
-//	}
-//}
 
 extern uint32_t SystemCoreClock;
 int main(void)
@@ -61,11 +52,8 @@ int main(void)
 #if (USB_DEBUG)
 			usb.OutputDebug();
 #endif
-			//uartSendString("hello");
-
 		}
 		serial.Command();			// Check for incoming CDC commands
-
 	}
 }
 

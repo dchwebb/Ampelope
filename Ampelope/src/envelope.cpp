@@ -1,6 +1,6 @@
 #include "envelope.h"
 #include <cmath>
-#include <ctgmath>
+//#include <ctgmath>
 
 
 float Envelope::CordicExp(float x)
@@ -14,7 +14,7 @@ float Envelope::CordicExp(float x)
 	// convert float to q1_31 format scaling x by 1/2 at the same time
 	int q31;
 	if (x < -1.118f) {
-		q31 = (int)((x + 1.0f) * 1073741824.0f);		// as range of x is limited to -1.118 to +1.118 reduce exponent by e^-1 (note that only values from around -1.75 to 0 used in this mechanism)
+		q31 = (int)((x + 1.0f) * 1073741824.0f);	// as range of x is limited to -1.118 to +1.118 reduce exponent by e^-1 (note that only values from around -1.75 to 0 used in this mechanism)
 	} else {
 		q31 = (int)(x * 1073741824.0f);
 	}
@@ -26,11 +26,12 @@ float Envelope::CordicExp(float x)
 	float cosh = (float)((int)CORDIC->RDATA) / 1073741824.0f;
 	float res = sinh + cosh;
 	if (x < -1.118f) {
-		return res * 0.3678794411714f;					// multiply by e^-1 to correct range offset
+		return res * 0.3678794411714f;				// multiply by e^-1 to correct range offset
 	} else {
 		return res;
 	}
 }
+
 
 float Envelope::CordicLn(float x)
 {
@@ -47,9 +48,8 @@ float Envelope::CordicLn(float x)
 
 
 
-void Envelope::calcEnvelope() {
-
-
+void Envelope::calcEnvelope()
+{
 	// Gate on
 	if ((GPIOC->IDR & GPIO_IDR_ID8) == 0) {
 		GPIOC->ODR |= GPIO_IDR_ID6;

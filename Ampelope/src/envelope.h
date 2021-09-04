@@ -1,7 +1,7 @@
 #pragma once
 
 #include "initialisation.h"
-#include <cmath>
+
 
 struct Envelope {
 public:
