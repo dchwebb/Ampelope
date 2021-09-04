@@ -1,5 +1,6 @@
 Hardware/Ampelope-backups/*
 Hardware/Ampelope_Components-backups/*
+Hardware/Ampelope_Panel-backups/*
 Hardware/Ampelope_Controls-backups/*
 Ampelope/Debug/*
 *.sch-bak
