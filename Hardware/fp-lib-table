@@ -1,0 +1,3 @@
+(fp_lib_table
+  (lib (name "Logo_Footprint")(type "KiCad")(uri "${KIPRJMOD}/Logo_Footprint")(options "")(descr ""))
+)
