@@ -191,4 +191,4 @@ VP_TIM3_VS_ClockSourceINT.Mode=Internal
 VP_TIM3_VS_ClockSourceINT.Signal=TIM3_VS_ClockSourceINT
 board=NUCLEO-G431RB
 boardIOC=true
-isbadioc=true
+isbadioc=false

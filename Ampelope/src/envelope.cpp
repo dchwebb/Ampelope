@@ -186,9 +186,9 @@ void Envelope::calcEnvelope()
 		cordic_inc += ADC_array[ADC_Release] * 200;
 
 		cordic_sin = static_cast<float>(static_cast<int32_t>(CORDIC->RDATA)) / 4294967295.0f + 0.5f;
-		DAC1->DHR12R1 = static_cast<uint32_t>((4095.0f - currentLevel * cordic_sin));
+		DAC1->DHR12R1 = static_cast<uint32_t>(currentLevel * cordic_sin);
 	} else {
-		DAC1->DHR12R1 = static_cast<uint32_t>(4095.0f - currentLevel);
+		DAC1->DHR12R1 = static_cast<uint32_t>(currentLevel);
 	}
 
 	GPIOC->ODR &= ~GPIO_ODR_ODR_6;
