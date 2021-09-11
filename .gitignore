@@ -2,6 +2,7 @@ Hardware/Ampelope-backups/*
 Hardware/Ampelope_Components-backups/*
 Hardware/Ampelope_Panel-backups/*
 Hardware/Ampelope_Controls-backups/*
+Hardware/Ampelope_3d_model-backups/*
 Ampelope/Debug/*
 *.sch-bak
 Ampelope/regs.docx

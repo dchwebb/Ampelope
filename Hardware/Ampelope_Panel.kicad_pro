@@ -193,7 +193,7 @@
       "idf": "",
       "netlist": "",
       "specctra_dsn": "",
-      "step": "",
+      "step": "3d_models/Ampelope_Panel.step",
       "vrml": ""
     },
     "page_layout_descr_file": ""

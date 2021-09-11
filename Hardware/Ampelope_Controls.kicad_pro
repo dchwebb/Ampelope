@@ -365,7 +365,7 @@
       "idf": "",
       "netlist": "",
       "specctra_dsn": "",
-      "step": "",
+      "step": "3d_models/Ampelope_Controls.step",
       "vrml": ""
     },
     "page_layout_descr_file": ""
@@ -392,7 +392,7 @@
     "legacy_lib_dir": "",
     "legacy_lib_list": [],
     "meta": {
-      "version": 1
+      "version": 0
     },
     "net_format_name": "",
     "page_layout_descr_file": "",
