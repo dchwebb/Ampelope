@@ -15,7 +15,7 @@
     "ratsnest_display_mode": 0,
     "selection_filter": {
       "dimensions": true,
-      "footprints": false,
+      "footprints": true,
       "graphics": true,
       "keepouts": true,
       "lockedItems": true,
@@ -63,8 +63,8 @@
       35,
       36
     ],
-    "visible_layers": "ffcffdf_ffffffff",
-    "zone_display_mode": 0
+    "visible_layers": "ffcffff_ffffffff",
+    "zone_display_mode": 1
   },
   "meta": {
     "filename": "Ampelope_Controls.kicad_prl",
