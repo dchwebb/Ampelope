@@ -16,6 +16,13 @@ public:
 	bool longTimes = true;
 	bool lfo = false;
 
+	uint32_t clockCounter;					// Counter used to calculate clock times in sample time
+	uint32_t lastClock;						// Time last clock signal received in sample time
+	uint32_t clockInterval;					// Clock interval in sample time
+	bool clockValid = false;
+	bool clockHigh = false;
+
+
 	const float timeStep = 1.0f / SAMPLERATE;	// one time unit - corresponding to sample time
 
 	enum class gateStates {off, attack, decay, sustain, release};

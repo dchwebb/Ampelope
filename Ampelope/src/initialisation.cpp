@@ -86,9 +86,11 @@ void InitIO()
 {
 	// MODER 00: Input mode, 01: General purpose output mode, 10: Alternate function mode, 11: Analog mode (reset state)
 
+	RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN;			// reset and clock control - advanced high performance bus - GPIO port A
 	RCC->AHB2ENR |= RCC_AHB2ENR_GPIOCEN;			// reset and clock control - advanced high performance bus - GPIO port C
 
 	GPIOC->MODER &= ~GPIO_MODER_MODER8;				// configure PC8 gate input
+	GPIOA->MODER &= ~GPIO_MODER_MODER9;				// configure PA9 clock input
 	GPIOC->MODER &= ~GPIO_MODER_MODER6_1;			// configure PC6 debug out
 }
 

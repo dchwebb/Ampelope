@@ -50,6 +50,20 @@ float Envelope::CordicLn(float x)
 
 void Envelope::calcEnvelope()
 {
+	// Check if clock received
+	if ((GPIOA->IDR & GPIO_IDR_IDR_9) == 0) {		// Clock signal high
+		if (!clockHigh) {
+			clockInterval = clockCounter - lastClock - 85;			// FIXME constant found by trial and error
+			lastClock = clockCounter;
+			clockHigh = true;
+		}
+	} else {
+		clockHigh = false;
+	}
+	clockValid = (clockCounter - lastClock < (SAMPLERATE * 2));					// Valid clock interval is within a second
+	++clockCounter;
+
+
 	// Gate on
 	if ((GPIOC->IDR & GPIO_IDR_ID8) == 0) {
 		GPIOC->ODR |= GPIO_IDR_ID6;

@@ -20,7 +20,6 @@ extern "C" {
 }
 
 
-
 extern uint32_t SystemCoreClock;
 int main(void)
 {

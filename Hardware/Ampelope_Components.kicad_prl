@@ -64,7 +64,7 @@
       36
     ],
     "visible_layers": "ffc7edd_ffffffff",
-    "zone_display_mode": 0
+    "zone_display_mode": 1
   },
   "meta": {
     "filename": "Ampelope_Components.kicad_prl",
