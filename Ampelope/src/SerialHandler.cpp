@@ -74,6 +74,7 @@ bool SerialHandler::Command()
 				"\r\nSupported commands:\r\n"
 				"info        -  Show diagnostic information\r\n"
 				"l/s         -  Long or Short envelope times\r\n"
+				"lfo         -  Tremolo LFO on/off\r\n"
 				"\r\n"
 #if (USB_DEBUG)
 				"usbdebug    -  Start USB debugging\r\n"

@@ -9,7 +9,7 @@ float Envelope::CordicExp(float x)
 	CORDIC->CSR = (6 << CORDIC_CSR_FUNC_Pos) | 		// 0: Cos, 1: Sin, 2: Phase, 3: Modulus, 4: Arctan, 5: cosh, 6: sinh, 7: Arctanh, 8: ln, 9: Square Root
 			CORDIC_CSR_SCALE_0 |					// Must be 1 for sinh
 			CORDIC_CSR_NRES |						// 2 Results as we need both sinh and cosh
-			(5 << CORDIC_CSR_PRECISION_Pos);		// Set precision to 5 (gives 5 * 4 = 20 iterations in 5 clock cycles)
+			(6 << CORDIC_CSR_PRECISION_Pos);		// Set precision to 6 (gives 6 * 4 = 24 iterations in 6 clock cycles)
 
 	// convert float to q1_31 format scaling x by 1/2 at the same time
 	int q31;
@@ -18,6 +18,8 @@ float Envelope::CordicExp(float x)
 	} else {
 		q31 = (int)(x * 1073741824.0f);
 	}
+
+	//volatile float etest = std::exp(x);
 
 	CORDIC->WDATA = q31;
 
@@ -53,7 +55,7 @@ void Envelope::calcEnvelope()
 	// Check if clock received
 	if ((GPIOA->IDR & GPIO_IDR_IDR_9) == 0) {		// Clock signal high
 		if (!clockHigh) {
-			clockInterval = clockCounter - lastClock - 85;			// FIXME constant found by trial and error
+			clockInterval = clockCounter - lastClock;
 			lastClock = clockCounter;
 			clockHigh = true;
 		}
@@ -197,7 +199,11 @@ void Envelope::calcEnvelope()
 				(5 << CORDIC_CSR_PRECISION_Pos);		// Set precision to 5 (gives 5 * 4 = 20 iterations in 5 clock cycles)
 
 		CORDIC->WDATA = cordic_inc;		// This should be a value between -1 and 1 in q1.31 format, relating to -pi to +pi
-		cordic_inc += ADC_array[ADC_Release] * 200;
+		if (clockValid) {
+			cordic_inc += 4294967295 / clockInterval;
+		} else {
+			cordic_inc += ADC_array[ADC_Release] * 200;
+		}
 
 		cordic_sin = static_cast<float>(static_cast<int32_t>(CORDIC->RDATA)) / 4294967295.0f + 0.5f;
 		DAC1->DHR12R1 = static_cast<uint32_t>(currentLevel * cordic_sin);
