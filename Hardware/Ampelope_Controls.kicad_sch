@@ -1,8 +1,13 @@
-(kicad_sch (version 20210615) (generator eeschema)
+(kicad_sch (version 20210621) (generator eeschema)
 
   (uuid 0ca426f0-d2c6-4ce8-bef6-47cbe98cfd81)
 
   (paper "A4")
+
+  (title_block
+    (title "Ampelope Controls Board")
+    (company "Mountjoy Modular")
+  )
 
   (lib_symbols
     (symbol "Connector:Conn_01x12_Male" (pin_names (offset 1.016) hide) (in_bom yes) (on_board yes)

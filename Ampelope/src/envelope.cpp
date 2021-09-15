@@ -52,6 +52,7 @@ float Envelope::CordicLn(float x)
 
 void Envelope::calcEnvelope()
 {
+	GPIOC->ODR |= GPIO_ODR_OD6;
 	// Check if clock received
 	if ((GPIOA->IDR & GPIO_IDR_IDR_9) == 0) {		// Clock signal high
 		if (!clockHigh) {
@@ -68,7 +69,7 @@ void Envelope::calcEnvelope()
 
 	// Gate on
 	if ((GPIOC->IDR & GPIO_IDR_ID8) == 0) {
-		GPIOC->ODR |= GPIO_IDR_ID6;
+
 		sustain = ADC_array[ADC_Sustain];
 
 		switch (gateState) {
@@ -114,7 +115,7 @@ void Envelope::calcEnvelope()
 				currentLevel = 4095.0f;
 				gateState = gateStates::decay;
 			}
-			GPIOC->ODR &= ~GPIO_IDR_ID6;
+			GPIOC->ODR &= ~GPIO_ODR_OD6;
 			break;
 
 		}
@@ -167,7 +168,7 @@ void Envelope::calcEnvelope()
 
 	} else {
 		if (currentLevel > 0.0f) {
-			GPIOC->ODR |= GPIO_IDR_ID6;
+			GPIOC->ODR |= GPIO_ODR_OD6;
 
 			release = ADC_array[ADC_Release];
 
