@@ -226,7 +226,7 @@
       (net 1 "GND") (pintype "passive") (tstamp 85d3711a-168b-4ace-8ebb-3138ea2cb397))
     (pad "3" thru_hole rect locked (at 0 -4.92 180) (size 2.5 1) (drill oval 1.5 0.5) (layers *.Cu *.Mask "F.SilkS")
       (net 9 "/Audio3_In") (pintype "passive") (tstamp bf6c2fb9-9e4b-487f-be18-8159f4bc71e7))
-    (model ":custom_3d:PJ301M-12 Thonkiconn v0.2.stp"
+    (model "D:/docs/kiCad/3d_Models/PJ301M-12 Thonkiconn v0.2.stp"
       (offset (xyz 0 0.6 0))
       (scale (xyz 1 1 1))
       (rotate (xyz 0 0 0))
@@ -370,7 +370,7 @@
       (net 35 "unconnected-(J16-Pad2)") (pintype "passive+no_connect") (tstamp 6eba9881-ad79-4938-a159-4a805b7dfe89))
     (pad "3" thru_hole rect locked (at 0 -4.92 180) (size 2.5 1) (drill oval 1.5 0.5) (layers *.Cu *.Mask "F.SilkS")
       (net 14 "/Audio4_Out") (pintype "passive") (tstamp 6b5dc9ae-f572-4d12-b729-775aa16c4049))
-    (model ":custom_3d:PJ301M-12 Thonkiconn v0.2.stp"
+    (model "D:/docs/kiCad/3d_Models/PJ301M-12 Thonkiconn v0.2.stp"
       (offset (xyz 0 0.6 0))
       (scale (xyz 1 1 1))
       (rotate (xyz 0 0 0))
@@ -414,7 +414,7 @@
       (net 3 "/Gate1_In") (pintype "passive") (tstamp 8f33bbd7-7827-4de1-8651-9dc01ad334cc))
     (pad "3" thru_hole rect locked (at 0 -4.92 180) (size 2.5 1) (drill oval 1.5 0.5) (layers *.Cu *.Mask "F.SilkS")
       (net 4 "/Gate2_In") (pintype "passive") (tstamp feb8d9ab-1a6e-4791-b59d-d2d44d1c2f07))
-    (model ":custom_3d:PJ301M-12 Thonkiconn v0.2.stp"
+    (model "D:/docs/kiCad/3d_Models/PJ301M-12 Thonkiconn v0.2.stp"
       (offset (xyz 0 0.6 0))
       (scale (xyz 1 1 1))
       (rotate (xyz 0 0 0))
@@ -458,7 +458,7 @@
       (net 1 "GND") (pintype "passive") (tstamp 2cfe1a11-abd4-4770-94d6-1e8771016dad))
     (pad "3" thru_hole rect locked (at 0 -4.92 180) (size 2.5 1) (drill oval 1.5 0.5) (layers *.Cu *.Mask "F.SilkS")
       (net 8 "/Audio2_In") (pintype "passive") (tstamp 7babc7ba-6416-4ef8-a517-ae2858f0c421))
-    (model ":custom_3d:PJ301M-12 Thonkiconn v0.2.stp"
+    (model "D:/docs/kiCad/3d_Models/PJ301M-12 Thonkiconn v0.2.stp"
       (offset (xyz 0 0.6 0))
       (scale (xyz 1 1 1))
       (rotate (xyz 0 0 0))
@@ -543,7 +543,7 @@
       (net 17 "unconnected-(J13-Pad2)") (pintype "passive+no_connect") (tstamp 08c2c30c-80b9-4bb0-907a-93d537f2d4c0))
     (pad "3" thru_hole rect locked (at 0 -4.92 180) (size 2.5 1) (drill oval 1.5 0.5) (layers *.Cu *.Mask "F.SilkS")
       (net 11 "/Audio1_Out") (pintype "passive") (tstamp cc9d19a9-6e94-4517-92be-eeca5141dff2))
-    (model ":custom_3d:PJ301M-12 Thonkiconn v0.2.stp"
+    (model "D:/docs/kiCad/3d_Models/PJ301M-12 Thonkiconn v0.2.stp"
       (offset (xyz 0 0.6 0))
       (scale (xyz 1 1 1))
       (rotate (xyz 0 0 0))
@@ -587,7 +587,7 @@
       (net 4 "/Gate2_In") (pintype "passive") (tstamp f3158cf3-0add-4e7d-a749-1849f0a2a295))
     (pad "3" thru_hole rect locked (at 0 -4.92 180) (size 2.5 1) (drill oval 1.5 0.5) (layers *.Cu *.Mask "F.SilkS")
       (net 5 "/Gate3_In") (pintype "passive") (tstamp b3c3e2e3-fae6-463a-91f3-49b46edc25d0))
-    (model ":custom_3d:PJ301M-12 Thonkiconn v0.2.stp"
+    (model "D:/docs/kiCad/3d_Models/PJ301M-12 Thonkiconn v0.2.stp"
       (offset (xyz 0 0.6 0))
       (scale (xyz 1 1 1))
       (rotate (xyz 0 0 0))
@@ -672,7 +672,7 @@
       (net 36 "unconnected-(J18-Pad2)") (pintype "passive+no_connect") (tstamp 6572b085-5170-426c-a404-ba0c8ff85aa1))
     (pad "3" thru_hole rect locked (at 0 -4.92 270) (size 2.5 1) (drill oval 1.5 0.5) (layers *.Cu *.Mask "F.SilkS")
       (net 23 "/Env1_Out") (pintype "passive") (tstamp e8582b2c-2614-4d6e-8afb-5491d3fb0be6))
-    (model ":custom_3d:PJ301M-12 Thonkiconn v0.2.stp"
+    (model "D:/docs/kiCad/3d_Models/PJ301M-12 Thonkiconn v0.2.stp"
       (offset (xyz 0 0.6 0))
       (scale (xyz 1 1 1))
       (rotate (xyz 0 0 0))
@@ -732,11 +732,6 @@
       (scale (xyz 1 1 1))
       (rotate (xyz 0 0 0))
     )
-    (model ":custom_3d:ALPHA-RD901F-40.step"
-      (offset (xyz 0 0 0))
-      (scale (xyz 1 1 1))
-      (rotate (xyz 0 0 0))
-    )
   )
 
   (footprint "Custom_Footprints:THONKICONN_hole" (layer "F.Cu")
@@ -776,7 +771,7 @@
       (net 1 "GND") (pintype "passive") (tstamp 0a476a7a-4c7b-455d-8677-ebe70538a0c6))
     (pad "3" thru_hole rect locked (at 0 -4.92 180) (size 2.5 1) (drill oval 1.5 0.5) (layers *.Cu *.Mask "F.SilkS")
       (net 10 "/Audio4_In") (pintype "passive") (tstamp 9acef660-228d-4d23-8b32-bac8983e81be))
-    (model ":custom_3d:PJ301M-12 Thonkiconn v0.2.stp"
+    (model "D:/docs/kiCad/3d_Models/PJ301M-12 Thonkiconn v0.2.stp"
       (offset (xyz 0 0.6 0))
       (scale (xyz 1 1 1))
       (rotate (xyz 0 0 0))
@@ -820,7 +815,7 @@
       (net 2 "/Gate_In") (pintype "passive") (tstamp 701bc58c-a7f6-48fe-bfe8-752d51760921))
     (pad "3" thru_hole rect locked (at 0 -4.92 180) (size 2.5 1) (drill oval 1.5 0.5) (layers *.Cu *.Mask "F.SilkS")
       (net 3 "/Gate1_In") (pintype "passive") (tstamp 92b84cba-681e-4e6d-9d10-9c1408551228))
-    (model ":custom_3d:PJ301M-12 Thonkiconn v0.2.stp"
+    (model "D:/docs/kiCad/3d_Models/PJ301M-12 Thonkiconn v0.2.stp"
       (offset (xyz 0 0.6 0))
       (scale (xyz 1 1 1))
       (rotate (xyz 0 0 0))
@@ -864,7 +859,7 @@
       (net 37 "unconnected-(J19-Pad2)") (pintype "passive+no_connect") (tstamp fb475be5-09fe-4c78-9a6c-39ff2d446a34))
     (pad "3" thru_hole rect locked (at 0 -4.92 90) (size 2.5 1) (drill oval 1.5 0.5) (layers *.Cu *.Mask "F.SilkS")
       (net 25 "/Env3_Out") (pintype "passive") (tstamp 27632e11-4f60-45bc-99bb-d9b6a5c9e9c5))
-    (model ":custom_3d:PJ301M-12 Thonkiconn v0.2.stp"
+    (model "D:/docs/kiCad/3d_Models/PJ301M-12 Thonkiconn v0.2.stp"
       (offset (xyz 0 0.6 0))
       (scale (xyz 1 1 1))
       (rotate (xyz 0 0 0))
@@ -1314,7 +1309,7 @@
       (net 18 "unconnected-(J14-Pad2)") (pintype "passive+no_connect") (tstamp b88a50c3-8018-4d7d-8908-4bae72c0ea9b))
     (pad "3" thru_hole rect locked (at 0 -4.92 180) (size 2.5 1) (drill oval 1.5 0.5) (layers *.Cu *.Mask "F.SilkS")
       (net 12 "/Audio2_Out") (pintype "passive") (tstamp cd87be94-656d-4a3f-b45d-9967b844b6c2))
-    (model ":custom_3d:PJ301M-12 Thonkiconn v0.2.stp"
+    (model "D:/docs/kiCad/3d_Models/PJ301M-12 Thonkiconn v0.2.stp"
       (offset (xyz 0 0.6 0))
       (scale (xyz 1 1 1))
       (rotate (xyz 0 0 0))
@@ -1358,7 +1353,7 @@
       (net 1 "GND") (pintype "passive") (tstamp 448aa076-783d-4ce7-a420-c4ff11146f91))
     (pad "3" thru_hole rect locked (at 0 -4.92) (size 2.5 1) (drill oval 1.5 0.5) (layers *.Cu *.Mask "F.SilkS")
       (net 24 "/Clock_In") (pintype "passive") (tstamp 862234f7-0cd9-4b45-8cc2-3bb4c27ebf41))
-    (model ":custom_3d:PJ301M-12 Thonkiconn v0.2.stp"
+    (model "D:/docs/kiCad/3d_Models/PJ301M-12 Thonkiconn v0.2.stp"
       (offset (xyz 0 0.6 0))
       (scale (xyz 1 1 1))
       (rotate (xyz 0 0 0))
@@ -1502,7 +1497,7 @@
       (net 19 "unconnected-(J15-Pad2)") (pintype "passive+no_connect") (tstamp bf1287dd-fd24-4681-806a-157697cacb70))
     (pad "3" thru_hole rect locked (at 0 -4.92 180) (size 2.5 1) (drill oval 1.5 0.5) (layers *.Cu *.Mask "F.SilkS")
       (net 13 "/Audio3_Out") (pintype "passive") (tstamp 4bf48a51-9ec0-4b9b-b0a9-7977f1f6571b))
-    (model ":custom_3d:PJ301M-12 Thonkiconn v0.2.stp"
+    (model "D:/docs/kiCad/3d_Models/PJ301M-12 Thonkiconn v0.2.stp"
       (offset (xyz 0 0.6 0))
       (scale (xyz 1 1 1))
       (rotate (xyz 0 0 0))
@@ -1587,7 +1582,7 @@
       (net 1 "GND") (pintype "passive") (tstamp 74d38eaa-2ef6-4db3-a768-1a352a3d10a1))
     (pad "3" thru_hole rect locked (at 0 -4.92 180) (size 2.5 1) (drill oval 1.5 0.5) (layers *.Cu *.Mask "F.SilkS")
       (net 7 "/Audio1_In") (pintype "passive") (tstamp f01dc4c1-5716-4f73-bdfa-b4372e86505d))
-    (model ":custom_3d:PJ301M-12 Thonkiconn v0.2.stp"
+    (model "D:/docs/kiCad/3d_Models/PJ301M-12 Thonkiconn v0.2.stp"
       (offset (xyz 0 0.6 0))
       (scale (xyz 1 1 1))
       (rotate (xyz 0 0 0))
@@ -1631,7 +1626,7 @@
       (net 5 "/Gate3_In") (pintype "passive") (tstamp 59baaa28-b1cc-42e0-a3a7-7a0962171fb4))
     (pad "3" thru_hole rect locked (at 0 -4.92 180) (size 2.5 1) (drill oval 1.5 0.5) (layers *.Cu *.Mask "F.SilkS")
       (net 6 "/Gate4_In") (pintype "passive") (tstamp 0846c44f-77f1-45d2-98e1-d3654732a996))
-    (model ":custom_3d:PJ301M-12 Thonkiconn v0.2.stp"
+    (model "D:/docs/kiCad/3d_Models/PJ301M-12 Thonkiconn v0.2.stp"
       (offset (xyz 0 0.6 0))
       (scale (xyz 1 1 1))
       (rotate (xyz 0 0 0))

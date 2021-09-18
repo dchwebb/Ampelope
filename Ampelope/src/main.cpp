@@ -44,7 +44,9 @@ int main(void)
 			x = 0;
 		}
 
-		DAC->DHR12R2 = 4095 - x;
+		DAC1->DHR12R2 = 4095 - x;		// PA5
+		//DAC3->DHR12R1 = 4095 - x;		// PA2
+		//DAC3->DHR12R2 = 4095 - x;		// PB1
 
 		if ((GPIOC->IDR & GPIO_IDR_ID13) != 0 && SysTickVal > buttonDebounce + 1000) {
 			buttonDebounce = SysTickVal;

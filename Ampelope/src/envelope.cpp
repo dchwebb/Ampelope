@@ -209,8 +209,11 @@ void Envelope::calcEnvelope()
 		cordic_sin = static_cast<float>(static_cast<int32_t>(CORDIC->RDATA)) / 4294967295.0f + 0.5f;
 		DAC1->DHR12R1 = static_cast<uint32_t>(currentLevel * cordic_sin);
 	} else {
-		DAC1->DHR12R1 = static_cast<uint32_t>(currentLevel);
+		DAC1->DHR12R1 = static_cast<uint32_t>(currentLevel);		// PA4 Env1
+		//DAC3->DHR12R1 = static_cast<uint32_t>(currentLevel);		// PA2 Env4
+		DAC3->DHR12R2 = static_cast<uint32_t>(currentLevel);		// PB1 Env3
 	}
 
 	GPIOC->ODR &= ~GPIO_ODR_ODR_6;
+
 }
