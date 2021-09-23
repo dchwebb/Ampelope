@@ -33,9 +33,9 @@
         "other_text_thickness": 0.15,
         "other_text_upright": false,
         "pads": {
-          "drill": 0.6,
-          "height": 1.5,
-          "width": 1.5
+          "drill": 5.0,
+          "height": 5.0,
+          "width": 5.0
         },
         "silk_line_width": 0.15,
         "silk_text_italic": false,
@@ -191,7 +191,7 @@
     "last_paths": {
       "gencad": "",
       "idf": "",
-      "netlist": "",
+      "netlist": "../../Addatone/Hardware/",
       "specctra_dsn": "",
       "step": "3d_models/Ampelope_Panel.step",
       "vrml": ""
