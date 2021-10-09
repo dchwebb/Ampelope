@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <cmath>		// for cordic test
 
-extern Envelope envelope;
+extern Envelopes envelopes;
 
 int32_t SerialHandler::ParseInt(const std::string cmd, const char precedingChar, int low = 0, int high = 0) {
 	int32_t val = -1;
@@ -66,7 +66,7 @@ bool SerialHandler::Command()
 	} else if (ComCmd.compare("info\n") == 0) {		// Print diagnostic information
 
 		usb->SendString("Mountjoy Ampelope v1.0 - Current Settings:\r\n\r\n"
-				"Envelope Times:" + std::string(envelope.longTimes ? "long" : "short") + "\r\n");
+				"Envelope Times:" + std::string(envelopes.envelope[0].longTimes ? "long" : "short") + "\r\n");
 
 	} else if (ComCmd.compare("help\n") == 0) {
 
@@ -89,14 +89,14 @@ bool SerialHandler::Command()
 #endif
 
 	} else if (ComCmd.compare("lfo\n") == 0) {				// LFO on/off
-		envelope.tremolo = !envelope.tremolo;
-		usb->SendString("LFO " + std::string(envelope.tremolo ? "on" : "off") + "\r\n");
+//		envelope.tremolo = !envelope.tremolo;
+//		usb->SendString("LFO " + std::string(envelope.tremolo ? "on" : "off") + "\r\n");
 
 	} else if (ComCmd.compare("l\n") == 0) {				// Long envelope times
-		envelope.longTimes = true;
+		//envelope.longTimes = true;
 
 	} else if (ComCmd.compare("s\n") == 0) {				// Short envelope times
-		envelope.longTimes = false;
+		//envelope.longTimes = false;
 
 	} else if (ComCmd.compare("cordic\n") == 0) {			// Cordic Test
 		TIM3->CR1 |= TIM_CR1_CEN;		// Disable timer interrupt

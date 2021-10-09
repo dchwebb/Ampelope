@@ -3,6 +3,13 @@
 //#include <ctgmath>
 
 
+void Envelopes::calcEnvelopes()
+{
+	for (Envelope& env : envelope) {
+		env.calcEnvelope();
+	}
+}
+
 float Envelope::CordicExp(float x)
 {
 	// use CORDIC sinh function and generate e^x = sinh(x) + cosh(x)
@@ -68,12 +75,12 @@ void Envelope::calcEnvelope()
 
 
 	// Gate on
-	if ((GatePort->IDR & (1 << GatePin)) == 0) {
+	if ((gatePort->IDR & (1 << gatePin)) == 0) {
 
-		longTimes = (ShortPort->IDR & (1 << ShortPin)) != 0;
-		tremolo = (TremPort->IDR & (1 << TremPin)) == 0;
+		longTimes = (shortPort->IDR & (1 << shortPin)) != 0;
+		tremolo = (tremPort->IDR & (1 << tremPin)) == 0;
 
-		sustain = ADC_array[ADC_Sustain_1];
+		sustain = adsr.sustain;
 
 		switch (gateState) {
 		case gateStates::off:
@@ -82,7 +89,7 @@ void Envelope::calcEnvelope()
 
 		case gateStates::attack: {
 
-			attack = std::round(((attack * 31.0f) + (float)ADC_array[ADC_Attack_1]) / 32.0f);
+			attack = std::round(((attack * 31.0f) + (float)adsr.attack) / 32.0f);
 
 			// fullRange = value of fully charged capacitor; comparitor value is 4096 where cap is charged enough to trigger decay phase
 			const float fullRange = 5000.0f;
@@ -124,7 +131,7 @@ void Envelope::calcEnvelope()
 		}
 
 		case gateStates::decay: {
-			decay = ADC_array[ADC_Decay_1];
+			decay = adsr.decay;
 
 			// scales decay pot to allow more range at low end of pot, exponentially longer times at upper end
 			float maxDurationMult = (longTimes ? 44.0f : 5.28f) / 4.4;		// to scale maximum delay time
@@ -173,7 +180,7 @@ void Envelope::calcEnvelope()
 		if (currentLevel > 0.0f) {
 			GPIOB->ODR |= GPIO_ODR_OD9;
 
-			release = ADC_array[ADC_Release_1];
+			release = adsr.release;
 
 			//const float releaseScale = 2.4f;			// higher values give shorter attack times at lower pot values
 			float maxDurationMult = (longTimes ? 44.0f : 5.2f) / 1.3;		// to scale maximum delay time
@@ -206,17 +213,15 @@ void Envelope::calcEnvelope()
 		if (clockValid) {
 			cordic_inc += 4294967295 / clockInterval;
 		} else {
-			cordic_inc += ADC_array[ADC_Release_1] * 200;
+			cordic_inc += ADC_array.Tremolo * 200;
 		}
 
 		cordic_sin = static_cast<float>(static_cast<int32_t>(CORDIC->RDATA)) / 4294967295.0f + 0.5f;
-		DAC1->DHR12R1 = static_cast<uint32_t>(currentLevel * cordic_sin);
+		*outputDAC = static_cast<uint32_t>(currentLevel * cordic_sin);
 	} else {
-		DAC1->DHR12R1 = static_cast<uint32_t>(currentLevel);		// PA4 Env1
-		DAC3->DHR12R1 = static_cast<uint32_t>(currentLevel);		// PA2 Env4
-		DAC3->DHR12R2 = static_cast<uint32_t>(currentLevel);		// PB1 Env3
+		*outputDAC = static_cast<uint32_t>(currentLevel);
 	}
 
-	GPIOC->ODR &= ~GPIO_ODR_ODR_6;
+	GPIOB->ODR &= ~GPIO_ODR_ODR_9;
 
 }

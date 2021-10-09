@@ -241,7 +241,7 @@ void InitADC()
 
 	DMA1_Channel1->CNDTR |= ADC_BUFFER_LENGTH;		// Number of data items to transfer (ie size of ADC buffer)
 	DMA1_Channel1->CPAR = (uint32_t)(&(ADC1->DR));	// Configure the peripheral data register address 0x40022040
-	DMA1_Channel1->CMAR = (uint32_t)(ADC_array);	// Configure the memory address (note that M1AR is used for double-buffer mode) 0x24000040
+	DMA1_Channel1->CMAR = (uint32_t)(&ADC_array);	// Configure the memory address (note that M1AR is used for double-buffer mode) 0x24000040
 
 	DMA1_Channel1->CCR |= DMA_CCR_EN;				// Enable DMA and wait
 	wait_loop_index = (SystemCoreClock / (100000UL * 2UL));

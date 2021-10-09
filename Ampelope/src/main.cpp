@@ -7,11 +7,12 @@
 // FIXME - add transistor to start VCA in off position
 
 volatile uint32_t SysTickVal;
-volatile uint16_t ADC_array[ADC_BUFFER_LENGTH];
+volatile ADCValues ADC_array;
+
 
 uint32_t buttonDebounce;
 uint16_t x = 0;
-Envelope envelope;
+Envelopes envelopes;
 USBHandler usb;
 SerialHandler serial(usb);
 
@@ -36,18 +37,7 @@ int main(void)
 
 	usb.InitUSB();
 
-	while (1)
-	{
-
-		x++;
-		if (x == 4096) {
-			x = 0;
-		}
-
-		DAC1->DHR12R2 = 4095 - x;		// PA5
-		//DAC3->DHR12R1 = 4095 - x;		// PA2
-		//DAC3->DHR12R2 = 4095 - x;		// PB1
-
+	while (1) {
 		if ((GPIOC->IDR & GPIO_IDR_ID13) != 0 && SysTickVal > buttonDebounce + 1000) {
 			buttonDebounce = SysTickVal;
 #if (USB_DEBUG)

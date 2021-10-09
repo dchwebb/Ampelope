@@ -7,10 +7,21 @@ extern volatile uint32_t SysTickVal;
 
 #define SYSTICK 1000						// 1ms
 #define SAMPLERATE 48000.0f
-
-
 #define ADC_BUFFER_LENGTH 9
-extern volatile uint16_t ADC_array[ADC_BUFFER_LENGTH];
+
+struct ADSR {
+	uint16_t attack;
+	uint16_t sustain;
+	uint16_t decay;
+	uint16_t release;
+};
+
+struct ADCValues {
+	ADSR EnvA;
+	ADSR EnvB;
+	uint16_t Tremolo;
+};
+
 enum ADC_Controls {
 	ADC_Attack_1   = 0,		// PC0
 	ADC_Decay_1    = 1,		// PC1
@@ -25,6 +36,7 @@ enum ADC_Controls {
 	ADC_LFO_Speed  = 8,		// PB11
 };
 
+extern volatile ADCValues ADC_array;
 
 void SystemClock_Config();
 void InitSysTick();
