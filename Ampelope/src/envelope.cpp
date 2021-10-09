@@ -52,7 +52,7 @@ float Envelope::CordicLn(float x)
 
 void Envelope::calcEnvelope()
 {
-	GPIOC->ODR |= GPIO_ODR_OD6;
+	GPIOB->ODR |= GPIO_ODR_OD9;
 	// Check if clock received
 	if ((GPIOA->IDR & GPIO_IDR_IDR_9) == 0) {		// Clock signal high
 		if (!clockHigh) {
@@ -68,9 +68,12 @@ void Envelope::calcEnvelope()
 
 
 	// Gate on
-	if ((GPIOC->IDR & GPIO_IDR_ID8) == 0) {
+	if ((GatePort->IDR & (1 << GatePin)) == 0) {
 
-		sustain = ADC_array[ADC_Sustain];
+		longTimes = (ShortPort->IDR & (1 << ShortPin)) != 0;
+		tremolo = (TremPort->IDR & (1 << TremPin)) == 0;
+
+		sustain = ADC_array[ADC_Sustain_1];
 
 		switch (gateState) {
 		case gateStates::off:
@@ -79,7 +82,7 @@ void Envelope::calcEnvelope()
 
 		case gateStates::attack: {
 
-			attack = std::round(((attack * 31.0f) + (float)ADC_array[ADC_Attack]) / 32.0f);
+			attack = std::round(((attack * 31.0f) + (float)ADC_array[ADC_Attack_1]) / 32.0f);
 
 			// fullRange = value of fully charged capacitor; comparitor value is 4096 where cap is charged enough to trigger decay phase
 			const float fullRange = 5000.0f;
@@ -115,13 +118,13 @@ void Envelope::calcEnvelope()
 				currentLevel = 4095.0f;
 				gateState = gateStates::decay;
 			}
-			GPIOC->ODR &= ~GPIO_ODR_OD6;
+			GPIOB->ODR &= ~GPIO_ODR_OD9;
 			break;
 
 		}
 
 		case gateStates::decay: {
-			decay = ADC_array[ADC_Decay];
+			decay = ADC_array[ADC_Decay_1];
 
 			// scales decay pot to allow more range at low end of pot, exponentially longer times at upper end
 			float maxDurationMult = (longTimes ? 44.0f : 5.28f) / 4.4;		// to scale maximum delay time
@@ -168,9 +171,9 @@ void Envelope::calcEnvelope()
 
 	} else {
 		if (currentLevel > 0.0f) {
-			GPIOC->ODR |= GPIO_ODR_OD6;
+			GPIOB->ODR |= GPIO_ODR_OD9;
 
-			release = ADC_array[ADC_Release];
+			release = ADC_array[ADC_Release_1];
 
 			//const float releaseScale = 2.4f;			// higher values give shorter attack times at lower pot values
 			float maxDurationMult = (longTimes ? 44.0f : 5.2f) / 1.3;		// to scale maximum delay time
@@ -195,7 +198,7 @@ void Envelope::calcEnvelope()
 		gateState = gateStates::off;
 	}
 
-	if (lfo) {
+	if (tremolo) {
 		CORDIC->CSR = (1 << CORDIC_CSR_FUNC_Pos) | 		// 0: Cosine, 1: Sine, 2: Phase, 3: Modulus, 4: Arctangent, 5: Hyperbolic cosine, 6: Hyperbolic sine, 7: Arctanh, 8: Natural logarithm, 9: Square Root
 				(5 << CORDIC_CSR_PRECISION_Pos);		// Set precision to 5 (gives 5 * 4 = 20 iterations in 5 clock cycles)
 
@@ -203,14 +206,14 @@ void Envelope::calcEnvelope()
 		if (clockValid) {
 			cordic_inc += 4294967295 / clockInterval;
 		} else {
-			cordic_inc += ADC_array[ADC_Release] * 200;
+			cordic_inc += ADC_array[ADC_Release_1] * 200;
 		}
 
 		cordic_sin = static_cast<float>(static_cast<int32_t>(CORDIC->RDATA)) / 4294967295.0f + 0.5f;
 		DAC1->DHR12R1 = static_cast<uint32_t>(currentLevel * cordic_sin);
 	} else {
 		DAC1->DHR12R1 = static_cast<uint32_t>(currentLevel);		// PA4 Env1
-		//DAC3->DHR12R1 = static_cast<uint32_t>(currentLevel);		// PA2 Env4
+		DAC3->DHR12R1 = static_cast<uint32_t>(currentLevel);		// PA2 Env4
 		DAC3->DHR12R2 = static_cast<uint32_t>(currentLevel);		// PB1 Env3
 	}
 

@@ -9,14 +9,20 @@ extern volatile uint32_t SysTickVal;
 #define SAMPLERATE 48000.0f
 
 
-#define ADC_BUFFER_LENGTH 4
+#define ADC_BUFFER_LENGTH 9
 extern volatile uint16_t ADC_array[ADC_BUFFER_LENGTH];
 enum ADC_Controls {
-	ADC_Attack   = 0,	// PC0 ADC12_IN6
-	ADC_Decay    = 1,	// PC1 ADC12_IN7
-	ADC_Sustain  = 2,	// PC2 ADC12_IN8
-	ADC_Release  = 3,	// PC3 ADC12_IN9
+	ADC_Attack_1   = 0,		// PC0
+	ADC_Decay_1    = 1,		// PC1
+	ADC_Sustain_1  = 2,		// PC2
+	ADC_Release_1  = 3,		// PC3
 
+	ADC_Attack_2   = 4,		// PA0
+	ADC_Decay_2    = 5,		// PA1
+	ADC_Sustain_2  = 6,		// PA3
+	ADC_Release_2  = 7,		// PB0
+
+	ADC_LFO_Speed  = 8,		// PB11
 };
 
 

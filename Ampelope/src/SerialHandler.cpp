@@ -89,8 +89,8 @@ bool SerialHandler::Command()
 #endif
 
 	} else if (ComCmd.compare("lfo\n") == 0) {				// LFO on/off
-		envelope.lfo = !envelope.lfo;
-		usb->SendString("LFO " + std::string(envelope.lfo ? "on" : "off") + "\r\n");
+		envelope.tremolo = !envelope.tremolo;
+		usb->SendString("LFO " + std::string(envelope.tremolo ? "on" : "off") + "\r\n");
 
 	} else if (ComCmd.compare("l\n") == 0) {				// Long envelope times
 		envelope.longTimes = true;

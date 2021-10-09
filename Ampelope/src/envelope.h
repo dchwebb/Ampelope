@@ -14,7 +14,7 @@ public:
 	int32_t cordic_inc = 0;
 	float cordic_sin = 0;
 	bool longTimes = true;
-	bool lfo = false;
+	bool tremolo = false;
 
 	uint32_t clockCounter;					// Counter used to calculate clock times in sample time
 	uint32_t lastClock;						// Time last clock signal received in sample time
@@ -31,6 +31,14 @@ public:
 	void calcEnvelope();
 	float CordicExp(float x);
 	float CordicLn(float x);
+
+private:
+	GPIO_TypeDef* GatePort = GPIOB;
+	uint8_t GatePin = 13;
+	GPIO_TypeDef* ShortPort = GPIOB;
+	uint8_t ShortPin = 5;
+	GPIO_TypeDef* TremPort = GPIOB;
+	uint8_t TremPin = 6;
 };
 
 

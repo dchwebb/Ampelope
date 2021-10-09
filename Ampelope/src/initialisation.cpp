@@ -1,7 +1,13 @@
 #include "initialisation.h"
 
-// Settings for 24MHz crystal
+// Settings for 24MHz (dev board) and 8MHz (production) crystal
+// 24MHz / 6(M) * 85(N) / 2(R) = 170MHz
+//  8MHz / 2(M) * 85(N) / 2(R) = 170MHz
+#if CRYSTAL_24MHZ
 #define PLL_M 0b101		// 0101: PLLM = 6
+#else
+#define PLL_M 0b001		// 0001: PLLM = 2
+#endif
 #define PLL_N 85
 #define PLL_R 0			//  00: PLLR = 2, 01: PLLR = 4, 10: PLLR = 6, 11: PLLR = 8
 #define PLL_P 2
@@ -38,6 +44,7 @@ void SystemClock_Config(void) {
 	RCC->CFGR |= RCC_CFGR_PPRE1_DIV1;			// PCLK1 = HCLK / 1 (APB1)
 	RCC->CFGR |= RCC_CFGR_PPRE2_DIV1;			// PCLK2 = HCLK / 1 (APB2)
 }
+
 
 void InitSysTick()
 {
@@ -87,11 +94,37 @@ void InitIO()
 	// MODER 00: Input mode, 01: General purpose output mode, 10: Alternate function mode, 11: Analog mode (reset state)
 
 	RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN;			// reset and clock control - advanced high performance bus - GPIO port A
+	RCC->AHB2ENR |= RCC_AHB2ENR_GPIOBEN;			// reset and clock control - advanced high performance bus - GPIO port B
 	RCC->AHB2ENR |= RCC_AHB2ENR_GPIOCEN;			// reset and clock control - advanced high performance bus - GPIO port C
 
-	GPIOC->MODER &= ~GPIO_MODER_MODER8;				// configure PC8 gate input
+	GPIOB->MODER &= ~GPIO_MODER_MODER13;			// configure PB13 gate 1 input
+	GPIOB->MODER &= ~GPIO_MODER_MODER14;			// configure PB14 gate 2 input
+	GPIOB->MODER &= ~GPIO_MODER_MODER15;			// configure PB15 gate 3 input
+	GPIOC->MODER &= ~GPIO_MODER_MODER6;				// configure PC6  gate 4 input
+
+	// NB PB6 is used in USB Power delivery and by default has a pull down to ground - disable in the PWR register (datasheet p.60 note 5)
+	PWR->CR3 |= PWR_CR3_UCPD_DBDIS;
+
+	GPIOB->MODER &= ~GPIO_MODER_MODER5;				// configure PB5  Env 1 Short input
+	GPIOB->MODER &= ~GPIO_MODER_MODER6;				// configure PB6  Env 1 tremolo input*
+	GPIOB->MODER &= ~GPIO_MODER_MODER3;				// configure PB3  Env 2 Short input
+	GPIOB->MODER &= ~GPIO_MODER_MODER4;				// configure PB4  Env 2 tremolo input
+	GPIOC->MODER &= ~GPIO_MODER_MODER10;			// configure PC10 Env 3 Short input
+	GPIOC->MODER &= ~GPIO_MODER_MODER12;			// configure PC12 Env 3 tremolo input
+	GPIOB->MODER &= ~GPIO_MODER_MODER12;			// configure PB12 Env 4 Short input
+	GPIOA->MODER &= ~GPIO_MODER_MODER15;			// configure PA15 Env 4 tremolo input
+
+	GPIOB->PUPDR |= GPIO_PUPDR_PUPDR5_0;			// configure PB5  Env 1 Pull-up
+	GPIOB->PUPDR |= GPIO_PUPDR_PUPDR6_0;			// configure PB6  Env 1 Pull-up
+	GPIOB->PUPDR |= GPIO_PUPDR_PUPDR3_0;			// configure PB3  Env 2 Pull-up
+	GPIOB->PUPDR |= GPIO_PUPDR_PUPDR4_0;			// configure PB4  Env 2 Pull-up
+	GPIOC->PUPDR |= GPIO_PUPDR_PUPDR10_0;			// configure PC10 Env 3 Pull-up
+	GPIOC->PUPDR |= GPIO_PUPDR_PUPDR12_0;			// configure PC12 Env 3 Pull-up
+	GPIOB->PUPDR |= GPIO_PUPDR_PUPDR12_0;			// configure PB12 Env 4 Pull-up
+	GPIOA->PUPDR |= GPIO_PUPDR_PUPDR15_0;			// configure PA15 Env 4 Pull-up
+
 	GPIOA->MODER &= ~GPIO_MODER_MODER9;				// configure PA9 clock input
-	GPIOC->MODER &= ~GPIO_MODER_MODER6_1;			// configure PC6 debug out
+	GPIOB->MODER &= ~GPIO_MODER_MODER9_1;			// configure PB9 debug out
 }
 
 
@@ -188,29 +221,15 @@ void InitADC()
 	2	PC2 ADC12_IN8		Env1 Sustain
 	3	PC3 ADC12_IN9		Env1 Release
 
-	PA0  ADC12_IN1          Env2 Attack
-	PA1  ADC12_IN2          Env2 Decay
-	PA3  ADC1_IN4           Env2 Sustain
-	PB0  ADC1_IN15          Env2 Release
+	4	PA0 ADC12_IN1		Env2 Attack
+	5	PA1 ADC12_IN2		Env2 Decay
+	6	PA3 ADC1_IN4		Env2 Sustain
+	7	PB0 ADC1_IN15		Env2 Release
 
-	PB11 ADC12_IN14			LFO Speed
-
-	PA6  ADC2_IN3
-	PA7  ADC2_IN4
-	PC4  ADC2_IN5
-	PC5  ADC2_IN11
-	PB2  ADC2_IN12
-	PB12 ADC1_IN11
-	PB14 ADC1_IN5
-	PB15 ADC2_IN15
-
-	[PA2 ADC1_IN3 DAC]
-	[PA4 ADC2_IN17 DAC]
-	[PA5 ADC2_IN13 DAC]
-	[PB1 ADC1_IN12 DAC]
+	8	PB11 ADC12_IN14		LFO Speed
 	*/
 
-	InitAdcPins(ADC1, {6, 7, 8, 9});
+	InitAdcPins(ADC1, {6, 7, 8, 9, 1, 2, 4, 15, 14});
 
 
 	// Enable ADC
