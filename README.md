@@ -1,6 +1,5 @@
 # Ampelope
-![Image](https://github.com/dchwebb/Ampelope/raw/master/pictures/ampelope_front.jpg "icon")
-![Image](https://github.com/dchwebb/Ampelope/raw/master/pictures/ampelope_back.jpg "icon")
+![Image](https://raw.githubusercontent.com/dchwebb/Ampelope/main/pictures/ampelope_front.jpg "icon")
 
 Overview
 --------
@@ -19,6 +18,7 @@ In addition to the envlopes internal connection to the VCA, envelopes 1 and 3 ar
 
 Technical
 ---------
+![Image](https://raw.githubusercontent.com/dchwebb/Ampelope/main/pictures/ampelope_back.jpg "icon")
 
 The module is controlled by an STM32G431 microcontroller which contains four 12-bit DACs. These are used to generate the four envelopes.
 
