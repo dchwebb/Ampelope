@@ -53,8 +53,8 @@ struct Envelopes {
 	Envelope envelope[4] = {
 			{ADC_array.EnvA, &(DAC1->DHR12R1), GPIOB, 13, GPIOB,  5, GPIOB,  6},		// PA4 Env1
 			{ADC_array.EnvA, &(DAC1->DHR12R2), GPIOB, 14, GPIOB,  3, GPIOB,  4},		// PA5 Env2
-			{ADC_array.EnvB, &(DAC3->DHR12R2), GPIOB, 15, GPIOC, 10, GPIOC, 12},		// PA2 Env4
-			{ADC_array.EnvB, &(DAC3->DHR12R1), GPIOC,  6, GPIOB, 12, GPIOA, 15} 		// PB1 Env3
+			{ADC_array.EnvB, &(DAC3->DHR12R2), GPIOB, 15, GPIOC, 10, GPIOC, 12},		// PB1 Env3
+			{ADC_array.EnvB, &(DAC3->DHR12R1), GPIOC,  6, GPIOB, 12, GPIOA, 15} 		// PA2 Env4
 	};
 };
 
