@@ -9,9 +9,7 @@
 volatile uint32_t SysTickVal;
 volatile ADCValues ADC_array;
 
-
 uint32_t buttonDebounce;
-uint16_t x = 0;
 Envelopes envelopes;
 USBHandler usb;
 SerialHandler serial(usb);
@@ -31,7 +29,7 @@ int main(void)
 	InitDAC();
 	InitIO();
 	InitEnvTimer();
-	InitADC();
+	InitADC(reinterpret_cast<volatile uint16_t*>(&ADC_array));
 	InitUart();
 	InitCordic();
 

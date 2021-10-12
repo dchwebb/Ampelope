@@ -77,13 +77,17 @@ void Envelope::calcEnvelope()
 	// Gate on
 	if ((gatePort->IDR & (1 << gatePin)) == 0) {
 
-		longTimes = (shortPort->IDR & (1 << shortPin)) != 0;
+		longADSR = (shortPort->IDR & (1 << shortPin)) != 0;
 		tremolo = (tremPort->IDR & (1 << tremPin)) == 0;
 
 		sustain = adsr.sustain;
 
 		switch (gateState) {
 		case gateStates::off:
+			gateState = gateStates::attack;
+			break;
+
+		case gateStates::release:
 			gateState = gateStates::attack;
 			break;
 
@@ -95,7 +99,7 @@ void Envelope::calcEnvelope()
 			const float fullRange = 5000.0f;
 
 			// scales attack pot to allow more range at low end of pot, exponentially longer times at upper end
-			float maxDurationMult = (longTimes ? 7.7f : 0.9f) / 1.73f;		// 1.73 allows duration to be set in seconds
+			float maxDurationMult = (longADSR ? 7.7f : 0.9f) / 1.73f;		// 1.73 allows duration to be set in seconds
 
 			// RC value - attackScale represents R component; maxDurationMult represents capacitor size (Reduce rc for a steeper curve)
 			float rc = std::pow(static_cast<float>(attack) / 4096.f, 3.0f) * maxDurationMult;		// Using a^3 for fast approximation for measured charging rate (^2.9)
@@ -134,7 +138,7 @@ void Envelope::calcEnvelope()
 			decay = adsr.decay;
 
 			// scales decay pot to allow more range at low end of pot, exponentially longer times at upper end
-			float maxDurationMult = (longTimes ? 44.0f : 5.28f) / 4.4;		// to scale maximum delay time
+			float maxDurationMult = (longADSR ? 44.0f : 5.28f) / 4.4;		// to scale maximum delay time
 
 			// RC value - decayScale represents R component; maxDurationMult represents capacitor size
 			float rc = std::pow((float)decay / 4096.0f, 2.0f) * maxDurationMult;		// Use x^2 as approximation for measured x^2.4
@@ -171,19 +175,17 @@ void Envelope::calcEnvelope()
 		case gateStates::sustain:
 			currentLevel = sustain;
 			break;
-
-		case gateStates::release:
-			break;
 		}
 
 	} else {
 		if (currentLevel > 0.0f) {
 			GPIOB->ODR |= GPIO_ODR_OD9;
 
+			gateState = gateStates::release;
+
 			release = adsr.release;
 
-			//const float releaseScale = 2.4f;			// higher values give shorter attack times at lower pot values
-			float maxDurationMult = (longTimes ? 44.0f : 5.2f) / 1.3;		// to scale maximum delay time
+			float maxDurationMult = (longADSR ? 14.585f : 1.15f);		// to scale maximum delay time
 
 			// RC value - decayScale represents R component; maxDurationMult represents capacitor size
 			float rc = std::pow(static_cast<float>(release) / 4096.0f, 2.0f) * maxDurationMult;
@@ -201,24 +203,26 @@ void Envelope::calcEnvelope()
 				currentLevel = 0.0f;
 			}
 
+		} else {
+			gateState = gateStates::off;
 		}
-		gateState = gateStates::off;
 	}
 
 	if (tremolo) {
-		CORDIC->CSR = (1 << CORDIC_CSR_FUNC_Pos) | 		// 0: Cosine, 1: Sine, 2: Phase, 3: Modulus, 4: Arctangent, 5: Hyperbolic cosine, 6: Hyperbolic sine, 7: Arctanh, 8: Natural logarithm, 9: Square Root
+		CORDIC->CSR = (0 << CORDIC_CSR_FUNC_Pos) | 		// 0: Cosine, 1: Sine, 2: Phase, 3: Modulus, 4: Arctangent, 5: Hyperbolic cosine, 6: Hyperbolic sine, 7: Arctanh, 8: Natural logarithm, 9: Square Root
 				(5 << CORDIC_CSR_PRECISION_Pos);		// Set precision to 5 (gives 5 * 4 = 20 iterations in 5 clock cycles)
 
-		CORDIC->WDATA = cordic_inc;		// This should be a value between -1 and 1 in q1.31 format, relating to -pi to +pi
+		CORDIC->WDATA = tremCosinePos;		// This should be a value between -1 and 1 in q1.31 format, relating to -pi to +pi
 		if (clockValid) {
-			cordic_inc += 4294967295 / clockInterval;
+			tremCosinePos += 4294967295 / clockInterval;
 		} else {
-			cordic_inc += ADC_array.Tremolo * 200;
+			tremCosinePos += ADC_array.Tremolo * 200;
 		}
 
-		cordic_sin = static_cast<float>(static_cast<int32_t>(CORDIC->RDATA)) / 4294967295.0f + 0.5f;
-		*outputDAC = static_cast<uint32_t>(currentLevel * cordic_sin);
+		tremCosineVal = static_cast<float>(static_cast<int32_t>(CORDIC->RDATA)) / 4294967295.0f + 0.5f;
+		*outputDAC = static_cast<uint32_t>(currentLevel * tremCosineVal);
 	} else {
+		tremCosinePos = 0;								// Reset cosine position to 0 so that it starts at full level when turned on
 		*outputDAC = static_cast<uint32_t>(currentLevel);
 	}
 
