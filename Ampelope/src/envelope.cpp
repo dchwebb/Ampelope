@@ -1,10 +1,42 @@
 #include "envelope.h"
 #include <cmath>
-//#include <ctgmath>
 
+
+uint32_t Envelopes::tremSpeed = 0;
 
 void Envelopes::calcEnvelopes()
 {
+	// Check if clock received
+	if ((GPIOA->IDR & GPIO_IDR_IDR_9) == 0) {		// Clock signal high
+		if (!clockHigh) {
+			clockInterval = clockCounter - lastClock;
+			lastClock = clockCounter;
+			clockHigh = true;
+		}
+	} else {
+		clockHigh = false;
+	}
+	clockValid = (clockCounter - lastClock < (SAMPLERATE * 2));					// Valid clock interval is within a second
+	++clockCounter;
+
+	if (clockValid) {
+		if (ADC_array.Tremolo > tremHysteresis + 20 || ADC_array.Tremolo < tremHysteresis - 20) {
+			tremHysteresis = ADC_array.Tremolo;
+
+			if (tremHysteresis < 682)				tremMult = 8.0f;
+			else if (tremHysteresis < 1365) 		tremMult = 4.0f;
+			else if (tremHysteresis < 2048) 		tremMult = 2.0f;
+			else if (tremHysteresis < 2731) 		tremMult = 1.0f;
+			else if (tremHysteresis < 3413) 		tremMult = 0.5f;
+			else 									tremMult = 0.25f;
+		}
+		tremSpeed = static_cast<uint32_t>(tremMult * static_cast<float>(clockInterval));
+
+	} else {
+		tremSpeed = 0;
+	}
+
+
 	for (Envelope& env : envelope) {
 		env.calcEnvelope();
 	}
@@ -60,19 +92,6 @@ float Envelope::CordicLn(float x)
 void Envelope::calcEnvelope()
 {
 	GPIOB->ODR |= GPIO_ODR_OD9;
-	// Check if clock received
-	if ((GPIOA->IDR & GPIO_IDR_IDR_9) == 0) {		// Clock signal high
-		if (!clockHigh) {
-			clockInterval = clockCounter - lastClock;
-			lastClock = clockCounter;
-			clockHigh = true;
-		}
-	} else {
-		clockHigh = false;
-	}
-	clockValid = (clockCounter - lastClock < (SAMPLERATE * 2));					// Valid clock interval is within a second
-	++clockCounter;
-
 
 	// Gate on
 	if ((gatePort->IDR & (1 << gatePin)) == 0) {
@@ -93,7 +112,7 @@ void Envelope::calcEnvelope()
 
 		case gateStates::attack: {
 
-			attack = std::round(((attack * 31.0f) + (float)adsr.attack) / 32.0f);
+			attack = std::round(((attack * 31.0f) + static_cast<float>(adsr.attack)) / 32.0f);
 
 			// fullRange = value of fully charged capacitor; comparitor value is 4096 where cap is charged enough to trigger decay phase
 			const float fullRange = 5000.0f;
@@ -213,10 +232,11 @@ void Envelope::calcEnvelope()
 				(5 << CORDIC_CSR_PRECISION_Pos);		// Set precision to 5 (gives 5 * 4 = 20 iterations in 5 clock cycles)
 
 		CORDIC->WDATA = tremCosinePos;		// This should be a value between -1 and 1 in q1.31 format, relating to -pi to +pi
-		if (clockValid) {
-			tremCosinePos += 4294967295 / clockInterval;
+
+		if (Envelopes::tremSpeed != 0) {
+			tremCosinePos += 4294967295 / Envelopes::tremSpeed;
 		} else {
-			tremCosinePos += ADC_array.Tremolo * 200;
+			tremCosinePos += (ADC_array.Tremolo + 50) * 400;
 		}
 
 		tremCosineVal = static_cast<float>(static_cast<int32_t>(CORDIC->RDATA)) / 4294967295.0f + 0.5f;
