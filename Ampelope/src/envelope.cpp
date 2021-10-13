@@ -6,6 +6,8 @@ uint32_t Envelopes::tremSpeed = 0;
 
 void Envelopes::calcEnvelopes()
 {
+	DEBUG_ON
+
 	// Check if clock received
 	if ((GPIOA->IDR & GPIO_IDR_IDR_9) == 0) {		// Clock signal high
 		if (!clockHigh) {
@@ -40,6 +42,8 @@ void Envelopes::calcEnvelopes()
 	for (Envelope& env : envelope) {
 		env.calcEnvelope();
 	}
+
+	DEBUG_OFF
 }
 
 float Envelope::CordicExp(float x)
@@ -91,8 +95,6 @@ float Envelope::CordicLn(float x)
 
 void Envelope::calcEnvelope()
 {
-	GPIOB->ODR |= GPIO_ODR_OD9;
-
 	// Gate on
 	if ((gatePort->IDR & (1 << gatePin)) == 0) {
 
@@ -148,7 +150,7 @@ void Envelope::calcEnvelope()
 				currentLevel = 4095.0f;
 				gateState = gateStates::decay;
 			}
-			GPIOB->ODR &= ~GPIO_ODR_OD9;
+
 			break;
 
 		}
@@ -198,10 +200,7 @@ void Envelope::calcEnvelope()
 
 	} else {
 		if (currentLevel > 0.0f) {
-			GPIOB->ODR |= GPIO_ODR_OD9;
-
 			gateState = gateStates::release;
-
 			release = adsr.release;
 
 			float maxDurationMult = (longADSR ? 14.585f : 1.15f);		// to scale maximum delay time
@@ -246,6 +245,6 @@ void Envelope::calcEnvelope()
 		*outputDAC = static_cast<uint32_t>(currentLevel);
 	}
 
-	GPIOB->ODR &= ~GPIO_ODR_ODR_9;
+
 
 }
