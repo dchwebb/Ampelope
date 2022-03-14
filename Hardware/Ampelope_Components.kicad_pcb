@@ -1,4 +1,4 @@
-(kicad_pcb (version 20210824) (generator pcbnew)
+(kicad_pcb (version 20211014) (generator pcbnew)
 
   (general
     (thickness 1.59)
@@ -2039,7 +2039,7 @@
       (net 97 "/Gate_In") (pinfunction "Pin_15") (tstamp 211d92eb-a881-46af-944c-06893aeab018))
     (pad "16" thru_hole circle locked (at 17.78 -2.54 180) (size 1.7 1.7) (drill 1) (layers *.Cu *.Mask)
       (net 97 "/Gate_In") (pinfunction "Pin_16") (tstamp b1795ff5-8aa0-46b9-8fae-fd00ca0aee62))
-    (model "D:/docs/kiCad/Custom_Footprints.pretty/3dmodels/pinhead_2x8_shrouded.step"
+    (model "D:/kicad/3d_models/pinhead_2x8_shrouded.step"
       (offset (xyz 17.8 2.5 0))
       (scale (xyz 1 1 1))
       (rotate (xyz 0 0 90))
@@ -5989,7 +5989,6 @@
   (gr_circle (center 146.4 96.7) (end 146.7 96.7) (layer "F.SilkS") (width 0.3) (fill solid) (tstamp cba1f410-78f4-4a55-ac31-9ba852bb6753))
   (gr_poly
     (pts
-
       (xy 110 62.4)
       (xy 103.8 62.4)
       (xy 103.8 51.5)

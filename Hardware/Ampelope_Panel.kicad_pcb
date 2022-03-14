@@ -1,4 +1,4 @@
-(kicad_pcb (version 20210824) (generator pcbnew)
+(kicad_pcb (version 20211014) (generator pcbnew)
 
   (general
     (thickness 1.6)
@@ -1530,7 +1530,6 @@
   (gr_line (start 131.1 76.5) (end 130.3 75.8) (layer "F.Mask") (width 0.6) (tstamp 0c4208a1-020b-44a6-815d-27ae7e827d66))
   (gr_poly
     (pts
-
       (xy 109.7 143.3)
       (xy 100.7 143.3)
       (xy 100.7 134.2)
@@ -1539,7 +1538,6 @@
   (gr_line (start 150.5 76.7) (end 155.7 70.3) (layer "F.Mask") (width 0.2) (tstamp 0f2b99f3-9ae4-42e5-8156-4bb6c1cbb2a3))
   (gr_poly
     (pts
-
       (xy 109.7 157.2)
       (xy 100.7 157.2)
       (xy 100.7 148.1)
@@ -1551,7 +1549,6 @@
   (gr_line (start 110.1 57.3) (end 104.9 50.9) (layer "F.Mask") (width 0.2) (tstamp 2808abf1-e342-4e61-b651-f5e518faadba))
   (gr_poly
     (pts
-
       (xy 144.5 130.8)
       (xy 136.1 130.8)
       (xy 136.1 122.4)
@@ -1559,7 +1556,6 @@
     ) (layer "F.Mask") (width 0.8) (fill solid) (tstamp 29ec16d1-422a-41f7-964e-bee56971ba08))
   (gr_poly
     (pts
-
       (xy 159.7 143.35)
       (xy 150.7 143.35)
       (xy 150.7 134.25)
@@ -1573,7 +1569,6 @@
   (gr_circle (center 157 88.1) (end 159 88.1) (layer "F.Mask") (width 0.2) (fill none) (tstamp 44672f73-c772-4357-be59-2c215f4a7577))
   (gr_poly
     (pts
-
       (xy 124.4 130.8)
       (xy 116 130.8)
       (xy 116 122.4)
@@ -1615,7 +1610,6 @@
   (gr_line (start 99.886051 166.4) (end 112.897713 166.4) (layer "F.Mask") (width 0.2) (tstamp b48b1b47-89bb-4755-b053-1d36a36430fb))
   (gr_poly
     (pts
-
       (xy 159.7 157.25)
       (xy 150.7 157.25)
       (xy 150.7 148.15)
