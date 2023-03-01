@@ -2,7 +2,7 @@
 
 #include "initialisation.h"
 #include "USB.h"
-
+#include <string>
 
 class SerialHandler {
 public:

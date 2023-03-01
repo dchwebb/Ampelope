@@ -3,6 +3,7 @@
 #include "initialisation.h"
 #include <functional>
 #include <cstring>
+#include <string>
 
 // Enables capturing of debug data for output over STLink UART on dev boards
 #define USB_DEBUG false
