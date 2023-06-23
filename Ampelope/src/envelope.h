@@ -16,7 +16,7 @@ struct ADCValues {
 	uint16_t Tremolo;
 };
 
-extern volatile ADCValues ADC_array;
+extern volatile ADCValues adc;
 
 struct Envelope {
 	friend class SerialHandler;					// Allow the serial handler access to private data for debug printing
@@ -75,10 +75,10 @@ private:
 	float    tremMult;						// Multiplier set by tremolo potentiometer when clock applied
 
 	Envelope envelope[4] = {
-			{ADC_array.EnvA, &(DAC1->DHR12R1), GPIOB, 13, GPIOB,  5, GPIOB,  6},		// PA4 Env1
-			{ADC_array.EnvA, &(DAC1->DHR12R2), GPIOB, 14, GPIOB,  3, GPIOB,  4},		// PA5 Env2
-			{ADC_array.EnvB, &(DAC3->DHR12R2), GPIOB, 15, GPIOC, 10, GPIOC, 12},		// PB1 Env3
-			{ADC_array.EnvB, &(DAC3->DHR12R1), GPIOC,  6, GPIOB, 12, GPIOA, 15} 		// PA2 Env4
+			{adc.EnvA, &(DAC1->DHR12R1), GPIOB, 13, GPIOB,  5, GPIOB,  6},		// PA4 Env1
+			{adc.EnvA, &(DAC1->DHR12R2), GPIOB, 14, GPIOB,  3, GPIOB,  4},		// PA5 Env2
+			{adc.EnvB, &(DAC3->DHR12R2), GPIOB, 15, GPIOC, 10, GPIOC, 12},		// PB1 Env3
+			{adc.EnvB, &(DAC3->DHR12R1), GPIOC,  6, GPIOB, 12, GPIOA, 15} 		// PA2 Env4
 	};
 };
 

@@ -7,7 +7,7 @@
 // FIXME - add transistor to start VCA in off position
 
 volatile uint32_t SysTickVal;
-volatile ADCValues ADC_array;
+volatile ADCValues adc;
 
 uint32_t buttonDebounce;
 Envelopes envelopes;
@@ -29,7 +29,7 @@ int main(void)
 	InitDAC();
 	InitIO();
 	InitEnvTimer();
-	InitADC(reinterpret_cast<volatile uint16_t*>(&ADC_array));
+	InitADC(reinterpret_cast<volatile uint16_t*>(&adc));
 	InitUart();
 	InitCordic();
 

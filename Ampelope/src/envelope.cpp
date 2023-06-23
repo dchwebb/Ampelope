@@ -22,8 +22,8 @@ void Envelopes::calcEnvelopes()
 	++clockCounter;
 
 	if (clockValid) {
-		if (ADC_array.Tremolo > tremHysteresis + 20 || ADC_array.Tremolo < tremHysteresis - 20) {
-			tremHysteresis = ADC_array.Tremolo;
+		if (adc.Tremolo > tremHysteresis + 20 || adc.Tremolo < tremHysteresis - 20) {
+			tremHysteresis = adc.Tremolo;
 
 			if (tremHysteresis < 682)				tremMult = 8.0f;
 			else if (tremHysteresis < 1365) 		tremMult = 4.0f;
@@ -235,7 +235,7 @@ void Envelope::calcEnvelope()
 		if (Envelopes::tremSpeed != 0) {
 			tremCosinePos += 4294967295 / Envelopes::tremSpeed;
 		} else {
-			tremCosinePos += (ADC_array.Tremolo + 50) * 400;
+			tremCosinePos += (adc.Tremolo + 50) * 400;
 		}
 
 		tremCosineVal = static_cast<float>(static_cast<int32_t>(CORDIC->RDATA)) / 4294967295.0f + 0.5f;
