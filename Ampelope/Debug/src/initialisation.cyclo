@@ -1,0 +1,8 @@
+../src/initialisation.cpp:16:6:void SystemClock_Config()	4
+../src/initialisation.cpp:49:6:void InitSysTick()	2
+../src/initialisation.cpp:55:6:void InitDAC()	1
+../src/initialisation.cpp:92:6:void InitIO()	1
+../src/initialisation.cpp:132:6:void InitEnvTimer()	1
+../src/initialisation.cpp:146:6:void InitAdcPins(ADC_TypeDef*, std::initializer_list<unsigned char>)	7
+../src/initialisation.cpp:172:6:void InitADC(volatile uint16_t*)	8
+../src/initialisation.cpp:256:6:void InitCordic()	1

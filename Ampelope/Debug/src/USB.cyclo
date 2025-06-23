@@ -1,0 +1,14 @@
+../src/USB.cpp:32:6:void USBHandler::ReadPMA(uint16_t, uint16_t)	3
+../src/USB.cpp:48:6:void USBHandler::WritePMA(uint16_t, uint16_t)	3
+../src/USB.cpp:125:6:void USBHandler::EPStartXfer(Direction, uint8_t, uint32_t)	2
+../src/USB.cpp:286:6:void USBHandler::InitUSB()	2
+../src/USB.cpp:303:6:void USBHandler::ActivateEndpoint(uint8_t, Direction, EndPointType, uint16_t)	8
+../src/USB.cpp:427:6:void USBHandler::StringToTxBuff(const char*)	3
+../src/USB.cpp:443:6:void USBHandler::IntToUnicode(uint32_t, uint8_t*, uint8_t)	4
+../src/USB.cpp:344:6:void USBHandler::GetDescriptor()	14
+../src/USB.cpp:58:6:void USBHandler::ProcessSetupPacket()	9
+../src/USB.cpp:152:6:void USBHandler::USBInterruptHandler()	23
+../src/USB.cpp:458:6:bool USBHandler::ReadInterrupts(uint32_t)	1
+../src/USB.cpp:473:6:void USBHandler::SendData(const uint8_t*, uint16_t, uint8_t)	3
+../src/USB.cpp:486:6:void USBHandler::SendString(const char*)	3
+../src/USB.cpp:496:6:void USBHandler::SendString(std::string)	1

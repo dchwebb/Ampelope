@@ -1,0 +1,4 @@
+../src/envelope.cpp:49:7:float Envelope::CordicExp(float)	0	static
+../src/envelope.cpp:81:7:float Envelope::CordicLn(float)	0	static
+../src/envelope.cpp:96:6:void Envelope::calcEnvelope()	24	static
+../src/envelope.cpp:7:6:void Envelopes::calcEnvelopes()	16	static
